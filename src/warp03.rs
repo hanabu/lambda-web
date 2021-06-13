@@ -25,7 +25,7 @@ type WarpResponse = warp::http::Response<warp::hyper::Body>;
 ///
 /// ```
 /// use lambda_web::warp::{self, Filter};
-/// use lambda_web::{is_running_on_lambda, run_actix_on_lambda, LambdaError};
+/// use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(),LambdaError> {

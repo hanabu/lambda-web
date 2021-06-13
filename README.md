@@ -1,6 +1,6 @@
 # lambda-web
 
-Run Actix web, ~~Rocket~~, ~~Warp~~ on AWS Lambda
+Run Actix web, ~~Rocket~~, Warp on AWS Lambda
 
 [![crates.io](https://img.shields.io/crates/v/lambda-web?label=latest)](https://crates.io/crates/lambda-web)
 
@@ -11,11 +11,11 @@ Run Actix web, ~~Rocket~~, ~~Warp~~ on AWS Lambda
 #### Supported
 
 * [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.6) 4.0.0-beta.6
+* [Warp](https://github.com/seanmonstar/warp) 0.3.1
 
 #### Work in progress
 
 * [Rocket](https://rocket.rs/)
-* [Warp](https://github.com/seanmonstar/warp)
 
 ### AWS infrastructure
 
@@ -70,6 +70,42 @@ async fn main() -> Result<(),LambdaError> {
             .bind("127.0.0.1:8080")?
             .run()
             .await?;
+    }
+    Ok(())
+}
+```
+
+### Warp
+
+Cargo.toml
+
+```toml
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+
+[dependencies]
+lambda-web = { version = "0.1.1", features=["warp03"] }
+tokio = { version = "1" }
+```
+
+main.rs
+
+```rust
+use lambda_web::warp::{self, Filter};
+use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
+
+#[tokio::main]
+async fn main() -> Result<(), LambdaError> {
+    // GET /hello/warp => 200 OK with body "Hello, warp!"
+    let hello = warp::path!("hello" / String).map(|name| format!("Hello, {}", name));
+
+    if is_running_on_lambda() {
+        // Run on AWS Lambda
+        run_warp_on_lambda(warp::service(hello)).await?;
+    } else {
+        // Run local server
+        warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
     }
     Ok(())
 }
