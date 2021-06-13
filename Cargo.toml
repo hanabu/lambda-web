@@ -20,7 +20,7 @@ default = ["br"]
 # Enable one of your favorite web-framework
 actix4 = ["actix-web", "actix-http", "actix-service"]
 #rocket05 = ["rocket"]
-#warp03 = ["warp"]
+warp03 = ["warp"]
 
 # Compress output with Brotli
 br = ["brotli"]
