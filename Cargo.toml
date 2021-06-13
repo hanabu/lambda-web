@@ -2,6 +2,7 @@
 name = "lambda-web"
 version = "0.1.0"
 authors = ["Hanabusa Masahiro <masa@hanabusa.net>"]
+description = "Run Rust web frameworks on AWS Lambda"
 edition = "2018"
 readme = "README.md"
 repository = "https://github.com/hanabu/lambda-web"
