@@ -161,7 +161,7 @@ impl TryFrom<ApiGatewayV2<'_>> for actix_http::Request {
         // Cookies
         let req = if let Some(cookies) = event.cookies {
             cookies.iter().fold(req, |req, cookie| {
-                if let Ok(cookie_decoded) = Cookie::parse(cookie as &str) {
+                if let Ok(cookie_decoded) = Cookie::parse_encoded(cookie as &str) {
                     req.cookie(cookie_decoded)
                 } else {
                     req
