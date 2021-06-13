@@ -27,7 +27,7 @@ use lamedh_runtime::{
 /// }
 ///
 /// #[actix_web::main]
-/// async fn main() -> std::io::Result<()> {
+/// async fn main() -> Result<(),LambdaError> {
 ///     let factory = move || {
 ///         App::new().service(index)
 ///     };
