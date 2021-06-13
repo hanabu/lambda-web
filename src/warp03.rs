@@ -29,9 +29,9 @@ type WarpResponse = warp::http::Response<warp::hyper::Body>;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(),LambdaError> {
-///    // GET /hello/warp => 200 OK with body "Hello, warp!"
-///    let hello = warp::path!("hello" / String)
-///        .map(|name| format!("Hello, {}!", name));
+///     // GET /hello/warp => 200 OK with body "Hello, warp!"
+///     let hello = warp::path!("hello" / String)
+///         .map(|name| format!("Hello, {}!", name));
 ///
 ///     if is_running_on_lambda() {
 ///         // Run on AWS Lambda
