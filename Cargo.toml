@@ -1,0 +1,36 @@
+[package]
+name = "lambda-web"
+version = "0.1.0"
+authors = ["Hanabusa Masahiro <masa@hanabusa.net>"]
+edition = "2018"
+readme = "README.md"
+repository = "https://github.com/hanabu/lambda-web"
+license = "MIT"
+keywords = ["lambda", "web"]
+categories = ["web-programming::http-server"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["br"]
+
+# Enable one of your favorite web-framework
+actix4 = ["actix-web"]
+rocket05 = ["rocket"]
+warp03 = ["warp"]
+
+# Compress output with Brotli
+br = ["brotli"]
+
+[dependencies]
+lambda_runtime = "^0.3.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "^1"
+
+actix-web = { version = "4.0.0-beta.6", default-features = false, features = ["cookies"], optional = true }
+rocket = { version = "0.5.0-rc.1", default-features = false, optional = true }
+warp = { version = "0.3.1", default-features = false, optional = true }
+
+brotli = { version = "3", features = ["std"], optional = true }
+
