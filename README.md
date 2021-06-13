@@ -2,6 +2,8 @@
 
 Run Actix web, ~~Rocket~~, ~~Warp~~ on AWS Lambda
 
+[![crates.io](https://img.shields.io/crates/v/lambda-web?label=latest)](https://crates.io/crates/lambda-web)
+
 ## Features
 
 ### Web frameworks
