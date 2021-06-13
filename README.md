@@ -75,11 +75,11 @@ async fn main() -> Result<(),LambdaError> {
 
 ## Create deploy ZIP file
 
-Currentry (Jun 2021), we have two options to run Rust on AWS Lambda: Amazon Linux 2 custom runtime or Docker container image.
+Currentry (Jun 2021), we have two options to run Rust on AWS Lambda: [Amazon Linux 2 custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) or Docker container image.
 
 I recommend Amazon Linux 2 custom runtime deploy because it's faster cold start time than container image.
 
-To build Amazon Linux 2 compatible binary, it's better to build inside container. First, build Amazon Linux 2 container with Rust toolchain. This repository contains [sample Dockerfile](https://github.com/hanabu/lambda-web/blob/main/docker/Dockerfile) for lambda builder.
+To build Amazon Linux 2 compatible binary, it's better to build inside container. First, build Amazon Linux 2 container with Rust toolchain. This repository contains [sample Dockerfile](https://github.com/hanabu/lambda-web/blob/main/docker/Dockerfile) .
 
 ```console
 $ git clone https://github.com/hanabu/lambda-web
@@ -118,8 +118,10 @@ path = "src/main.rs"
 
 ### Lambda
 
-* Create lambda function with custom runtime. Choose "Provide your own bootstrap on Amazon Linux 2"
+* Create lambda function with `provided.al2` custom runtime. Choose "Provide your own bootstrap on Amazon Linux 2" .
 * Upload ZIP file described above.
+* IAM role, memory settings, etc. are as your demands. \
+  As sample code above consumes only 30MB of memory, many simple Rust app can fit in 128MB setting.
 
 ### API Gateway
 
