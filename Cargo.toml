@@ -8,6 +8,7 @@ repository = "https://github.com/hanabu/lambda-web"
 license = "MIT"
 keywords = ["lambda", "web"]
 categories = ["web-programming::http-server"]
+exclude = ["/docker/"]
 
 [package.metadata.docs.rs]
 all-features = true

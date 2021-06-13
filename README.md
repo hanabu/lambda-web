@@ -34,6 +34,10 @@ Run Actix web, ~~Rocket~~, ~~Warp~~ on AWS Lambda
 Cargo.toml
 
 ```toml
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+
 [dependencies]
 lambda-web = { version = "0.1.0", features=["actix4"] }
 ```
@@ -43,7 +47,6 @@ main.rs
 ```rust
 use lambda_web::actix_web::{self, get, App, HttpServer, Responder};
 use lambda_web::{is_running_on_lambda, run_actix_on_lambda, LambdaError};
-
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -66,12 +69,50 @@ async fn main() -> Result<(),LambdaError> {
             .run()
             .await?;
     }
+    Ok(())
 }
 ```
 
 ## Create deploy ZIP file
 
+Currentry (Jun 2021), we have two options to run Rust on AWS Lambda: Amazon Linux 2 custom runtime or Docker container image.
 
+I recommend Amazon Linux 2 custom runtime deploy because it's faster cold start time than container image.
+
+To build Amazon Linux 2 compatible binary, it's better to build inside container. First, build Amazon Linux 2 container with Rust toolchain. This repository contains [sample Dockerfile](https://github.com/hanabu/lambda-web/blob/main/docker/Dockerfile) for lambda builder.
+
+```console
+$ git clone https://github.com/hanabu/lambda-web
+...
+$ docker build -t lambda_builder lambda-web/docker
+...
+
+or
+$ buildah bud -t lambda_builder lambda-web/docker
+...
+```
+
+Once you get lambda_builder image, then build your code with Amazon Linux.
+
+```console
+$ cd your_app_crate_dir
+$ docker run -it --rm -v ~/.cargo/registry:/root/.cargo/registry:z -v .:/build:z lambda_builder
+...
+
+or
+$ podman run -it --rm -v ~/.cargo/registry:/root/.cargo/registry:z -v .:/build:z lambda_builder
+...
+```
+
+Then, you get deploy ZIP package in your_app_crate_dir/target_lambda/deploy.zip .
+
+Make sure, your Cargo.toml has `bootstrap` binary name.
+
+```toml
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+```
 
 ## Setup AWS Lambda & API gateway
 
