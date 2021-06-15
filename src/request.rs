@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //!
 //! Lambda event deserialize
 //!

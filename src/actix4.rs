@@ -1,4 +1,4 @@
-//!
+// SPDX-License-Identifier: MIT
 //! Run Actix Web on AWS Lambda
 //!
 //!

@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: MIT
 //!
 //! Run Warp 0.3.x on AWS Lambda
-//!
 //!
 use crate::request::ApiGatewayV2;
 use core::convert::TryFrom;
@@ -59,7 +59,7 @@ where
     Ok(())
 }
 
-/// Lambda_runtime handler for Actix Web
+/// Lambda_runtime handler for Warp
 struct WarpHandler<S>(S)
 where
     S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
