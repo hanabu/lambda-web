@@ -11,8 +11,8 @@ Run Actix web, Rocket, Warp on AWS Lambda
 #### Supported
 
 * [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.6) 4.0.0-beta.6
-* [Rocket](https://rocket.rs/) 0.5.0-rc.1
-* [Warp](https://github.com/seanmonstar/warp) 0.3.1
+* [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
+* [Warp](https://crates.io/crates/warp) 0.3.1
 
 ### AWS infrastructure
 
