@@ -83,6 +83,7 @@ path = "src/main.rs"
 
 [dependencies]
 lambda-web = { version = "0.1.2", features=["rocket05"] }
+rocket = "0.5.0-rc.1"
 ```
 
 main.rs
@@ -165,7 +166,7 @@ $ buildah bud -t lambda_builder lambda-web/docker
 ...
 ```
 
-Once you get lambda_builder image, then build your code with Amazon Linux.
+Once you get lambda\_builder image, then build your code with Amazon Linux.
 
 ```console
 $ cd your_app_crate_dir
@@ -177,7 +178,7 @@ $ podman run -it --rm -v ~/.cargo/registry:/root/.cargo/registry:z -v .:/build:z
 ...
 ```
 
-Then, you get deploy ZIP package in your_app_crate_dir/target_lambda/deploy.zip .
+Then, you get deploy ZIP package in your\_app\_crate\_dir/target\_lambda/deploy.zip .
 
 Make sure, your Cargo.toml has `bootstrap` binary name.
 
