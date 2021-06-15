@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 mod request;
 pub use lamedh_runtime::Error as LambdaError;
 
@@ -7,6 +8,13 @@ mod actix4;
 pub use actix4::run_actix_on_lambda;
 #[cfg(feature = "actix4")]
 pub use actix_web;
+
+#[cfg(feature = "rocket05")]
+mod rocket05;
+#[cfg(feature = "rocket05")]
+pub use rocket;
+#[cfg(feature = "rocket05")]
+pub use rocket05::launch_rocket_on_lambda;
 
 #[cfg(feature = "warp03")]
 mod warp03;
