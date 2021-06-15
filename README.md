@@ -1,6 +1,6 @@
 # lambda-web
 
-Run Actix web, ~~Rocket~~, Warp on AWS Lambda
+Run Actix web, Rocket, Warp on AWS Lambda
 
 [![crates.io](https://img.shields.io/crates/v/lambda-web?label=latest)](https://crates.io/crates/lambda-web)
 
@@ -11,11 +11,8 @@ Run Actix web, ~~Rocket~~, Warp on AWS Lambda
 #### Supported
 
 * [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.6) 4.0.0-beta.6
+* [Rocket](https://rocket.rs/) 0.5.0-rc.1
 * [Warp](https://github.com/seanmonstar/warp) 0.3.1
-
-#### Work in progress
-
-* [Rocket](https://rocket.rs/)
 
 ### AWS infrastructure
 
@@ -70,6 +67,44 @@ async fn main() -> Result<(),LambdaError> {
             .bind("127.0.0.1:8080")?
             .run()
             .await?;
+    }
+    Ok(())
+}
+```
+
+### Rocket
+
+Cargo.toml
+
+```toml
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+
+[dependencies]
+lambda-web = { version = "0.1.2", features=["rocket05"] }
+```
+
+main.rs
+
+```rust
+use lambda_web::rocket::{self, get, routes};
+use lambda_web::{is_running_on_lambda, launch_rocket_on_lambda, LambdaError};
+
+#[get("/hello/<name>/<age>")]
+fn hello(name: &str, age: u8) -> String {
+    format!("Hello, {} year old named {}!", age, name)
+}
+
+#[rocket::main]
+async fn main() -> Result<(), LambdaError> {
+    let rocket = rocket::build().mount("/", routes![hello]);
+    if is_running_on_lambda() {
+        // Launch on AWS Lambda
+        launch_rocket_on_lambda(rocket).await?;
+    } else {
+        // Launch local server
+        rocket.launch().await?;
     }
     Ok(())
 }
