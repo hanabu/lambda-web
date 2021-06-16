@@ -148,9 +148,9 @@ impl TryFrom<ApiGatewayV2<'_>> for actix_http::Request {
 
         // path ? query_string
         let path_and_query: Cow<str> = if event.raw_query_string.is_empty() {
-            event.raw_path
+            event.encoded_path()
         } else {
-            format!("{}?{}", event.raw_path, event.raw_query_string).into()
+            format!("{}?{}", event.encoded_path(), event.raw_query_string).into()
         };
 
         // Method, Source IP

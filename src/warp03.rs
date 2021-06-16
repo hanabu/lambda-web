@@ -130,12 +130,15 @@ impl TryFrom<ApiGatewayV2<'_>> for WarpRequest {
         let uri = if event.raw_query_string.is_empty() {
             format!(
                 "https://{}{}",
-                event.request_context.domain_name, event.raw_path
+                event.request_context.domain_name,
+                event.encoded_path()
             )
         } else {
             format!(
                 "https://{}{}?{}",
-                event.request_context.domain_name, event.raw_path, event.raw_query_string
+                event.request_context.domain_name,
+                event.encoded_path(),
+                event.raw_query_string
             )
         };
 

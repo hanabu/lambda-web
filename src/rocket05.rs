@@ -121,9 +121,9 @@ impl TryFrom<ApiGatewayV2<'_>> for RequestDecode {
 
         // path ? query_string
         let path_and_query = if event.raw_query_string.is_empty() {
-            event.raw_path.to_string()
+            event.encoded_path().to_string()
         } else {
-            format!("{}?{}", event.raw_path, event.raw_query_string)
+            format!("{}?{}", event.encoded_path(), event.raw_query_string)
         };
 
         // Method, Source IP
@@ -203,8 +203,8 @@ impl RequestDecode {
 }
 
 /// API Gateway response from Rocket response
-async fn api_gateway_response_from_rocket<'a>(
-    response: rocket::local::asynchronous::LocalResponse<'a>,
+async fn api_gateway_response_from_rocket(
+    response: rocket::local::asynchronous::LocalResponse<'_>,
 ) -> Result<serde_json::Value, rocket::Error> {
     use serde_json::json;
 
@@ -221,6 +221,6 @@ async fn api_gateway_response_from_rocket<'a>(
         "isBase64Encoded": true,
         "statusCode": status_code,
         "headers": headers,
-        "body": base64::encode(response.into_bytes().await.unwrap_or(vec![]))
+        "body": base64::encode(response.into_bytes().await.unwrap_or_default())
     }))
 }

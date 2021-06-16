@@ -75,3 +75,36 @@ pub struct Http<'a> {
     // The User-Agent header of the API caller.
     // pub user_agent: Cow<'a, str>,
 }
+
+// raw_path in API Gateway V2 is percent decoded
+// Path containing space or UTF-8 char is
+// required to percent encoded again before passed to web frameworks
+// See RFC3986 3.3 Path for valid chars.
+const RFC3986_PATH_ESCAPE_SET: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'%')
+    .add(b'+')
+    .add(b':')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'@')
+    .add(b'[')
+    .add(b'\\')
+    .add(b']')
+    .add(b'^')
+    .add(b'`')
+    .add(b'{')
+    .add(b'|')
+    .add(b'}');
+
+impl<'a> ApiGatewayV2<'a> {
+    pub(crate) fn encoded_path(&'a self) -> Cow<'a, str> {
+        Cow::from(percent_encoding::utf8_percent_encode(
+            &self.raw_path,
+            &RFC3986_PATH_ESCAPE_SET,
+        ))
+    }
+}

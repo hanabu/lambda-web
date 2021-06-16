@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
-mod request;
 pub use lamedh_runtime::Error as LambdaError;
+
+#[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
+mod request;
 
 #[cfg(feature = "actix4")]
 mod actix4;
