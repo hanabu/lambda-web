@@ -90,7 +90,7 @@ rocket = "0.5.0-rc.1"
 main.rs
 
 ```rust
-use lambda_web::rocket::{self, get, routes};
+use rocket::{self, get, routes};
 use lambda_web::{is_running_on_lambda, launch_rocket_on_lambda, LambdaError};
 
 #[get("/hello/<name>/<age>")]

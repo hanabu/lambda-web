@@ -22,7 +22,7 @@ use lamedh_runtime::{
 /// Launch Rocket application on AWS Lambda
 ///
 /// ```
-/// use lambda_web::rocket::{self, get, routes};
+/// use rocket::{self, get, routes};
 /// use lambda_web::{is_running_on_lambda, launch_rocket_on_lambda, LambdaError};
 ///
 /// #[get("/hello/<name>/<age>")]
