@@ -4,6 +4,7 @@
 
 * Fix bug in rawPath handling.\
   Since API Gateway decodes percent encoding of rawPath, path containing %20 did not work correctly.
+* Remove unused struct fields
 
 ## 0.1.2 : 2021-06-15
 
