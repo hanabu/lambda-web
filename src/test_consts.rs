@@ -259,7 +259,6 @@ pub(crate) const API_GATEWAY_V2_GET_TWO_COOKIES: &str = r###"{
     "version":"2.0"
 }"###;
 
-
 //
 // Form POST
 //
@@ -306,4 +305,3 @@ pub(crate) const API_GATEWAY_V2_POST_FORM_URLENCODED_B64: &str = r###"{
     },
     "version":"2.0"
 }"###;
-

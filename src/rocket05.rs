@@ -374,22 +374,27 @@ mod tests {
 
     #[async_test]
     async fn test_form_post() {
+        use rocket::http::ContentType;
         use rocket::http::Method;
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
         assert_eq!(req.inner().method(), Method::Post);
+        assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
 
         // Base64 encoded
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
         assert_eq!(req.inner().method(), Method::Post);
+        assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
     }
 
     #[async_test]
@@ -400,9 +405,14 @@ mod tests {
         let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
-        assert_eq!(req.inner().headers().get_one("x-forwarded-port"), Some("443"));
-        assert_eq!(req.inner().headers().get_one("x-forwarded-proto"), Some("https"));
-
+        assert_eq!(
+            req.inner().headers().get_one("x-forwarded-port"),
+            Some("443")
+        );
+        assert_eq!(
+            req.inner().headers().get_one("x-forwarded-proto"),
+            Some("https")
+        );
     }
 
     #[async_test]
@@ -418,12 +428,21 @@ mod tests {
         let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
-        assert_eq!(req.inner().cookies().get("cookie1").unwrap().value(), "value1");
+        assert_eq!(
+            req.inner().cookies().get("cookie1").unwrap().value(),
+            "value1"
+        );
 
         let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
-        assert_eq!(req.inner().cookies().get("cookie1").unwrap().value(), "value1");
-        assert_eq!(req.inner().cookies().get("cookie2").unwrap().value(), "value2");
+        assert_eq!(
+            req.inner().cookies().get("cookie1").unwrap().value(),
+            "value1"
+        );
+        assert_eq!(
+            req.inner().cookies().get("cookie2").unwrap().value(),
+            "value2"
+        );
     }
 }
