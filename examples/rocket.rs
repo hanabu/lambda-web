@@ -1,5 +1,5 @@
-use rocket::{self, get, routes};
 use lambda_web::{is_running_on_lambda, launch_rocket_on_lambda, LambdaError};
+use rocket::{self, get, routes};
 
 #[get("/hello/<name>/<age>")]
 fn hello(name: &str, age: u8) -> String {

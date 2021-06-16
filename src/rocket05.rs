@@ -21,7 +21,7 @@ use lamedh_runtime::{
 
 /// Launch Rocket application on AWS Lambda
 ///
-/// ```
+/// ```no_run
 /// use rocket::{self, get, routes};
 /// use lambda_web::{is_running_on_lambda, launch_rocket_on_lambda, LambdaError};
 ///
@@ -223,4 +223,40 @@ async fn api_gateway_response_from_rocket(
         "headers": headers,
         "body": base64::encode(response.into_bytes().await.unwrap_or_default())
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{request::ApiGatewayV2, test_consts::*};
+
+    #[test]
+    fn test_path_decode() {
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let req = RequestDecode::try_from(reqjson).unwrap();
+        assert_eq!(&req.path_and_query, "/");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
+        let req = RequestDecode::try_from(reqjson).unwrap();
+        assert_eq!(&req.path_and_query, "/somewhere");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
+        let req = RequestDecode::try_from(reqjson).unwrap();
+        assert_eq!(&req.path_and_query, "/path%20with/space");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
+        let req = RequestDecode::try_from(reqjson).unwrap();
+        assert_eq!(&req.path_and_query, "/path%25with/percent");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
+        let req = RequestDecode::try_from(reqjson).unwrap();
+        assert_eq!(
+            &req.path_and_query,
+            "/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
+        );
+    }
 }

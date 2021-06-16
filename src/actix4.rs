@@ -19,7 +19,7 @@ use lamedh_runtime::{
 
 /// Run Actix web application on AWS Lambda
 ///
-/// ```
+/// ```no_run
 /// use lambda_web::actix_web::{self, get, App, HttpServer, Responder};
 /// use lambda_web::{is_running_on_lambda, run_actix_on_lambda, LambdaError};
 ///
