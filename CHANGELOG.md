@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.3 : Unreleased
+## 0.1.3 : 2021-06-16
 
 * Fix bug in rawPath handling.\
   Since API Gateway decodes percent encoding of rawPath, path containing %20 did not work correctly.
