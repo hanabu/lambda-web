@@ -225,3 +225,131 @@ async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
         "body": base64::encode(body_bytes.to_vec())
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{request::ApiGatewayV2, test_consts::*};
+
+    #[test]
+    fn test_path_decode() {
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().path(), "/");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().path(), "/somewhere");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().path(), "/path%20with/space");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().path(), "/path%25with/percent");
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(
+            req.uri().path(),
+            "/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
+        );
+    }
+
+    #[test]
+    fn test_query_decode() {
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().query(), Some("key=value"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().query(), Some("key=value"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().query(), Some("key1=value1&key2=value2"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().query(), Some("key=value1+value2"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.uri().query(), Some("key=%E6%97%A5%E6%9C%AC%E8%AA%9E"));
+    }
+
+    #[test]
+    fn test_remote_ip_decode() {
+        use std::net::IpAddr;
+        use std::str::FromStr;
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(
+            req.peer_addr().unwrap().ip(),
+            IpAddr::from_str("1.2.3.4").unwrap()
+        );
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_REMOTE_IPV6).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(
+            req.peer_addr().unwrap().ip(),
+            IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_form_post() {
+        use actix_web::http::Method;
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.method(), Method::POST);
+
+        // Base64 encoded
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.method(), Method::POST);
+    }
+
+    #[test]
+    fn test_parse_header() {
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.head().headers.get("x-forwarded-port").unwrap(), &"443");
+        assert_eq!(
+            req.head().headers.get("x-forwarded-proto").unwrap(),
+            &"https"
+        );
+    }
+
+    #[test]
+    fn test_parse_cookies() {
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.head().headers.get("cookie"), None);
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(req.head().headers.get("cookie").unwrap(), &"cookie1=value1");
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
+        let req = actix_http::Request::try_from(reqjson).unwrap();
+        assert_eq!(
+            req.head().headers.get("cookie").unwrap(),
+            &"cookie2=value2; cookie1=value1"
+        );
+    }
+}
