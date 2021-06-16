@@ -255,14 +255,20 @@ mod tests {
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/path%20with/space");
-        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("path with/space")));
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("path with/space"))
+        );
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/path%25with/percent");
-        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("path%with/percent")));
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("path%with/percent"))
+        );
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
@@ -272,7 +278,10 @@ mod tests {
             &decode.path_and_query,
             "/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
         );
-        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("日本語/ファイル名")));
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("日本語/ファイル名"))
+        );
     }
 
     #[async_test]
@@ -280,8 +289,7 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/?key=value");
@@ -301,21 +309,121 @@ mod tests {
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere?key1=value1&key2=value2");
-        assert_eq!(req.inner().query_value::<&str>("key1").unwrap(), Ok("value1"));
-        assert_eq!(req.inner().query_value::<&str>("key2").unwrap(), Ok("value2"));
+        assert_eq!(
+            req.inner().query_value::<&str>("key1").unwrap(),
+            Ok("value1")
+        );
+        assert_eq!(
+            req.inner().query_value::<&str>("key2").unwrap(),
+            Ok("value2")
+        );
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere?key=value1+value2");
-        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value1 value2"));
+        assert_eq!(
+            req.inner().query_value::<&str>("key").unwrap(),
+            Ok("value1 value2")
+        );
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
-        assert_eq!(&decode.path_and_query, "/somewhere?key=%E6%97%A5%E6%9C%AC%E8%AA%9E");
-        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("日本語"));
+        assert_eq!(
+            &decode.path_and_query,
+            "/somewhere?key=%E6%97%A5%E6%9C%AC%E8%AA%9E"
+        );
+        assert_eq!(
+            req.inner().query_value::<&str>("key").unwrap(),
+            Ok("日本語")
+        );
+    }
+
+    #[async_test]
+    async fn test_remote_ip_decode() {
+        use std::net::IpAddr;
+        use std::str::FromStr;
+
+        let rocket = rocket::build();
+        let client = Client::untracked(rocket).await.unwrap();
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(decode.source_ip, IpAddr::from_str("1.2.3.4").unwrap());
+        assert_eq!(
+            req.inner().client_ip(),
+            Some(IpAddr::from_str("1.2.3.4").unwrap())
+        );
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_REMOTE_IPV6).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(
+            decode.source_ip,
+            IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
+        );
+        assert_eq!(
+            req.inner().client_ip(),
+            Some(IpAddr::from_str("2404:6800:400a:80c::2004").unwrap())
+        );
+    }
+
+    #[async_test]
+    async fn test_form_post() {
+        use rocket::http::Method;
+        let rocket = rocket::build();
+        let client = Client::untracked(rocket).await.unwrap();
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
+        assert_eq!(req.inner().method(), Method::Post);
+
+        // Base64 encoded
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
+        assert_eq!(req.inner().method(), Method::Post);
+    }
+
+    #[async_test]
+    async fn test_parse_header() {
+        let rocket = rocket::build();
+        let client = Client::untracked(rocket).await.unwrap();
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(req.inner().headers().get_one("x-forwarded-port"), Some("443"));
+        assert_eq!(req.inner().headers().get_one("x-forwarded-proto"), Some("https"));
+
+    }
+
+    #[async_test]
+    async fn test_parse_cookies() {
+        let rocket = rocket::build();
+        let client = Client::untracked(rocket).await.unwrap();
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(req.inner().cookies().iter().count(), 0);
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(req.inner().cookies().get("cookie1").unwrap().value(), "value1");
+
+        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(req.inner().cookies().get("cookie1").unwrap().value(), "value1");
+        assert_eq!(req.inner().cookies().get("cookie2").unwrap().value(), "value2");
     }
 }
