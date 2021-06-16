@@ -229,34 +229,93 @@ async fn api_gateway_response_from_rocket(
 mod tests {
     use super::*;
     use crate::{request::ApiGatewayV2, test_consts::*};
+    use rocket::{async_test, local::asynchronous::Client};
+    use std::path::PathBuf;
 
-    #[test]
-    fn test_path_decode() {
+    #[async_test]
+    async fn test_path_decode() {
+        let rocket = rocket::build();
+        let client = Client::untracked(rocket).await.unwrap();
+
         let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let req = RequestDecode::try_from(reqjson).unwrap();
-        assert_eq!(&req.path_and_query, "/");
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
-        let req = RequestDecode::try_from(reqjson).unwrap();
-        assert_eq!(&req.path_and_query, "/somewhere");
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/somewhere");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
-        let req = RequestDecode::try_from(reqjson).unwrap();
-        assert_eq!(&req.path_and_query, "/path%20with/space");
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/path%20with/space");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("path with/space")));
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
-        let req = RequestDecode::try_from(reqjson).unwrap();
-        assert_eq!(&req.path_and_query, "/path%25with/percent");
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/path%25with/percent");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("path%with/percent")));
 
         let reqjson: ApiGatewayV2 =
             serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
-        let req = RequestDecode::try_from(reqjson).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
         assert_eq!(
-            &req.path_and_query,
+            &decode.path_and_query,
             "/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
         );
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("日本語/ファイル名")));
+    }
+
+    #[async_test]
+    async fn test_query_decode() {
+        let rocket = rocket::build();
+        let client = Client::untracked(rocket).await.unwrap();
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/?key=value");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
+        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/somewhere?key=value");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
+        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/somewhere?key1=value1&key2=value2");
+        assert_eq!(req.inner().query_value::<&str>("key1").unwrap(), Ok("value1"));
+        assert_eq!(req.inner().query_value::<&str>("key2").unwrap(), Ok("value2"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/somewhere?key=value1+value2");
+        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value1 value2"));
+
+        let reqjson: ApiGatewayV2 =
+            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/somewhere?key=%E6%97%A5%E6%9C%AC%E8%AA%9E");
+        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("日本語"));
     }
 }
