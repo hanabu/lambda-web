@@ -197,6 +197,7 @@ pub(crate) const API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY: &str = r###"{
 //
 // IPv6 source IP
 //
+#[allow(dead_code)]
 pub(crate) const API_GATEWAY_V2_GET_REMOTE_IPV6: &str = r###"{
     "headers":{
         "x-forwarded-for":"2404:6800:400a:80c::2004",
