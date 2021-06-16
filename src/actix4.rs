@@ -347,9 +347,9 @@ mod tests {
 
         let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
         let req = actix_http::Request::try_from(reqjson).unwrap();
-        assert_eq!(
-            req.head().headers.get("cookie").unwrap(),
-            &"cookie2=value2; cookie1=value1"
+        assert!(
+            req.head().headers.get("cookie").unwrap() == &"cookie2=value2; cookie1=value1"
+                || req.head().headers.get("cookie").unwrap() == &"cookie1=value1; cookie2=value2"
         );
     }
 }
