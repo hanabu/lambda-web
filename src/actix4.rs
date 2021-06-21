@@ -56,6 +56,7 @@ where
         > + 'static,
     S::InitError: std::fmt::Debug,
     B: actix_web::body::MessageBody,
+    B::Error: std::fmt::Debug,
 {
     // Prepare actix_service::Service
     let srv = factory().into_factory();
@@ -77,7 +78,8 @@ where
             Response = actix_web::dev::ServiceResponse<B>,
             Error = actix_web::Error,
         > + 'static,
-    B: actix_web::body::MessageBody;
+    B: actix_web::body::MessageBody,
+    B::Error: std::fmt::Debug;
 
 impl<S, B> LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for ActixHandler<S, B>
 where
@@ -87,8 +89,9 @@ where
             Error = actix_web::Error,
         > + 'static,
     B: actix_web::body::MessageBody,
+    B::Error: std::fmt::Debug,
 {
-    type Error = actix_web::Error;
+    type Error = B::Error;
     type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>> + 'static>>;
 
     /// Lambda handler function
@@ -219,9 +222,9 @@ impl<B> crate::brotli::ResponseCompression for actix_web::dev::ServiceResponse<B
 
 /// API Gateway response from Actix-web response
 async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
-    mut response: actix_web::dev::ServiceResponse<B>,
+    response: actix_web::dev::ServiceResponse<B>,
     client_support_br: bool,
-) -> Result<serde_json::Value, actix_web::Error> {
+) -> Result<serde_json::Value, B::Error> {
     use crate::brotli::ResponseCompression;
     use serde_json::json;
 
@@ -238,7 +241,7 @@ async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
 
     // check if response should be compressed
     let compress = client_support_br && response.can_brotli_compress();
-    let body_bytes = actix_web::body::to_bytes(response.take_body()).await?;
+    let body_bytes = actix_web::body::to_bytes(response.into_body()).await?;
     let body_base64 = if compress {
         headers.insert("content-encoding".to_string(), json!("br"));
         crate::brotli::compress_response_body(&body_bytes)

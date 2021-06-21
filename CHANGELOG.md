@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 : 2021-06-21
+
+* Update Actix-Web to 4.0.0-beta.7
+
 ## 0.1.4 : 2021-06-21
 
 * Support transparent Brotli compression
