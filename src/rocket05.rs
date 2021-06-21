@@ -68,6 +68,9 @@ impl LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for RocketHandler {
     fn call(&mut self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
+        // check if web client supports content-encoding: br
+        let client_br = crate::brotli::client_supports_brotli(&event);
+
         // Parse request
         let decode_result = RequestDecode::try_from(event);
         let client = self.0.clone();
@@ -81,7 +84,7 @@ impl LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for RocketHandler {
                     let response = local_request.dispatch().await;
 
                     // Return response as API Gateway JSON
-                    api_gateway_response_from_rocket(response).await
+                    api_gateway_response_from_rocket(response, client_br).await
                 }
                 Err(_request_err) => {
                     // Request parsing error
@@ -202,10 +205,24 @@ impl RequestDecode {
     }
 }
 
+impl crate::brotli::ResponseCompression for rocket::local::asynchronous::LocalResponse<'_> {
+    /// Content-Encoding header value
+    fn content_encoding<'a>(&'a self) -> Option<&'a str> {
+        self.headers().get_one("content-encoding")
+    }
+
+    /// Content-Type header value
+    fn content_type<'a>(&'a self) -> Option<&'a str> {
+        self.headers().get_one("content-type")
+    }
+}
+
 /// API Gateway response from Rocket response
 async fn api_gateway_response_from_rocket(
     response: rocket::local::asynchronous::LocalResponse<'_>,
+    client_support_br: bool,
 ) -> Result<serde_json::Value, rocket::Error> {
+    use crate::brotli::ResponseCompression;
     use serde_json::json;
 
     // HTTP status
@@ -217,11 +234,21 @@ async fn api_gateway_response_from_rocket(
         headers.insert(header.name.into_string(), json!(header.value));
     }
 
+    // check if response should be compressed
+    let compress = client_support_br && response.can_brotli_compress();
+    let body_bytes = response.into_bytes().await.unwrap_or_default();
+    let body_base64 = if compress {
+        headers.insert("content-encoding".to_string(), json!("br"));
+        crate::brotli::compress_response_body(&body_bytes)
+    } else {
+        base64::encode(body_bytes)
+    };
+
     Ok(json!({
         "isBase64Encoded": true,
         "statusCode": status_code,
         "headers": headers,
-        "body": base64::encode(response.into_bytes().await.unwrap_or_default())
+        "body": body_base64
     }))
 }
 

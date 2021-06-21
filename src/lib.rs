@@ -6,6 +6,8 @@ pub use lamedh_runtime::Error as LambdaError;
 mod test_consts;
 
 #[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
+pub(crate) mod brotli;
+#[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
 mod request;
 
 #[cfg(feature = "actix4")]
