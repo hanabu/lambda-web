@@ -97,6 +97,9 @@ where
     fn call(&mut self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
+        // check if web client supports content-encoding: br
+        let client_br = crate::brotli::client_supports_brotli(&event);
+
         // Parse request
         let actix_request = actix_http::Request::try_from(event);
 
@@ -109,7 +112,7 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_actix_web(response).await
+                        api_gateway_response_from_actix_web(response, client_br).await
                     } else {
                         // Some Actix web error -> 500 Internal Server Error
                         Ok(json!({
@@ -198,10 +201,28 @@ impl TryFrom<ApiGatewayV2<'_>> for actix_http::Request {
     }
 }
 
+impl<B> crate::brotli::ResponseCompression for actix_web::dev::ServiceResponse<B> {
+    /// Content-Encoding header value
+    fn content_encoding<'a>(&'a self) -> Option<&'a str> {
+        self.headers()
+            .get(actix_web::http::header::CONTENT_ENCODING)
+            .and_then(|val| val.to_str().ok())
+    }
+
+    /// Content-Type header value
+    fn content_type<'a>(&'a self) -> Option<&'a str> {
+        self.headers()
+            .get(actix_web::http::header::CONTENT_TYPE)
+            .and_then(|val| val.to_str().ok())
+    }
+}
+
 /// API Gateway response from Actix-web response
 async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
     mut response: actix_web::dev::ServiceResponse<B>,
+    client_support_br: bool,
 ) -> Result<serde_json::Value, actix_web::Error> {
+    use crate::brotli::ResponseCompression;
     use serde_json::json;
 
     // HTTP status
@@ -215,14 +236,21 @@ async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
         }
     }
 
-    // Body
+    // check if response should be compressed
+    let compress = client_support_br && response.can_brotli_compress();
     let body_bytes = actix_web::body::to_bytes(response.take_body()).await?;
+    let body_base64 = if compress {
+        headers.insert("content-encoding".to_string(), json!("br"));
+        crate::brotli::compress_response_body(&body_bytes)
+    } else {
+        base64::encode(body_bytes)
+    };
 
     Ok(json!({
         "isBase64Encoded": true,
         "statusCode": status_code,
         "headers": headers,
-        "body": base64::encode(body_bytes.to_vec())
+        "body": body_base64
     }))
 }
 
