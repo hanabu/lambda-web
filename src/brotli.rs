@@ -70,7 +70,7 @@ pub(crate) fn client_supports_brotli(req: &crate::request::ApiGatewayV2<'_>) -> 
 
 // Without Brotli support, always returns false
 #[cfg(not(feature = "br"))]
-pub(crate) fn client_supports_brotli(req: &crate::request::ApiGatewayV2<'_>) -> bool {
+pub(crate) fn client_supports_brotli(_req: &crate::request::ApiGatewayV2<'_>) -> bool {
     false
 }
 

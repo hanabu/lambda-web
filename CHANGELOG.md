@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 : 2021-06-21
+
+* Support transparent Brotli compression
+
 ## 0.1.3 : 2021-06-16
 
 * Fix bug in rawPath handling.\
