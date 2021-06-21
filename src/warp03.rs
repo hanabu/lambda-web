@@ -79,6 +79,9 @@ where
     fn call(&mut self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
+        // check if web client supports content-encoding: br
+        let client_br = crate::brotli::client_supports_brotli(&event);
+
         // Parse request
         let warp_request = WarpRequest::try_from(event);
 
@@ -91,7 +94,7 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_warp(response).await
+                        api_gateway_response_from_warp(response, client_br).await
                     } else {
                         // Some Warp error -> 500 Internal Server Error
                         Ok(json!({
@@ -183,12 +186,34 @@ impl TryFrom<ApiGatewayV2<'_>> for WarpRequest {
     }
 }
 
+impl crate::brotli::ResponseCompression for WarpResponse {
+    /// Content-Encoding header value
+    fn content_encoding<'a>(&'a self) -> Option<&'a str> {
+        self.headers()
+            .get(warp::hyper::header::CONTENT_ENCODING)
+            .and_then(|val| val.to_str().ok())
+    }
+
+    /// Content-Type header value
+    fn content_type<'a>(&'a self) -> Option<&'a str> {
+        self.headers()
+            .get(warp::hyper::header::CONTENT_TYPE)
+            .and_then(|val| val.to_str().ok())
+    }
+}
+
 /// API Gateway response from Warp response
 async fn api_gateway_response_from_warp(
     response: WarpResponse,
+    client_support_br: bool,
 ) -> Result<serde_json::Value, LambdaError> {
+    use crate::brotli::ResponseCompression;
     use serde_json::json;
 
+    // Check if response should be compressed
+    let compress = client_support_br && response.can_brotli_compress();
+
+    // Divide resonse into headers and body
     let (parts, res_body) = response.into_parts();
 
     // HTTP status
@@ -202,14 +227,20 @@ async fn api_gateway_response_from_warp(
         }
     }
 
-    // Body
+    // Compress, base64 encode the response body
     let body_bytes = warp::hyper::body::to_bytes(res_body).await?;
+    let body_base64 = if compress {
+        headers.insert("content-encoding".to_string(), json!("br"));
+        crate::brotli::compress_response_body(&body_bytes)
+    } else {
+        base64::encode(body_bytes)
+    };
 
     Ok(json!({
         "isBase64Encoded": true,
         "statusCode": status_code,
         "headers": headers,
-        "body": base64::encode(body_bytes.to_vec())
+        "body": body_base64,
     }))
 }
 
