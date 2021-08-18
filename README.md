@@ -11,7 +11,7 @@ Run Actix web, Rocket, Warp on AWS Lambda
 
 #### Supported
 
-* [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.7) 4.0.0-beta.7
+* [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.8) 4.0.0-beta.8
 * [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
 * [Warp](https://crates.io/crates/warp) 0.3.1
 
@@ -39,7 +39,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.0", features=["actix4"] }
+lambda-web = { version = "0.1.6", features=["actix4"] }
 ```
 
 main.rs
@@ -83,7 +83,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.2", features=["rocket05"] }
+lambda-web = { version = "0.1.6", features=["rocket05"] }
 rocket = "0.5.0-rc.1"
 ```
 
@@ -122,7 +122,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.1", features=["warp03"] }
+lambda-web = { version = "0.1.6", features=["warp03"] }
 tokio = { version = "1" }
 ```
 

@@ -5,18 +5,13 @@
 use crate::request::ApiGatewayV2;
 use core::convert::TryFrom;
 use core::future::Future;
-use std::convert::Infallible;
-use std::pin::Pin;
-/*
 use lambda_runtime::{
     run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
     Handler as LambdaHandler,
 };
-*/
-use lamedh_runtime::{
-    run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
-    Handler as LambdaHandler,
-};
+use std::cell::RefCell;
+use std::convert::Infallible;
+use std::pin::Pin;
 
 type WarpRequest = warp::http::Request<warp::hyper::Body>;
 type WarpResponse = warp::http::Response<warp::hyper::Body>;
@@ -49,18 +44,15 @@ type WarpResponse = warp::http::Response<warp::hyper::Body>;
 pub async fn run_warp_on_lambda<S>(svc: S) -> Result<(), LambdaError>
 where
     S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
-        + Clone
-        + Send
         + 'static,
-    S::Future: Send,
 {
-    lambda_runtime_run(WarpHandler(svc)).await?;
+    lambda_runtime_run(WarpHandler(RefCell::new(svc))).await?;
 
     Ok(())
 }
 
 /// Lambda_runtime handler for Warp
-struct WarpHandler<S>(S)
+struct WarpHandler<S>(RefCell<S>)
 where
     S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
         + 'static;
@@ -71,12 +63,12 @@ where
         + 'static,
 {
     type Error = LambdaError;
-    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>> + 'static>>;
+    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
 
     /// Lambda handler function
     /// Parse Lambda event as Warp request,
     /// serialize Warp response to Lambda JSON response
-    fn call(&mut self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
+    fn call(&self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
         // check if web client supports content-encoding: br
@@ -86,7 +78,7 @@ where
         let warp_request = WarpRequest::try_from(event);
 
         // Call Warp service when request parsing succeeded
-        let svc_call = warp_request.map(|req| self.0.call(req));
+        let svc_call = warp_request.map(|req| self.0.borrow_mut().call(req));
 
         let fut = async move {
             match svc_call {

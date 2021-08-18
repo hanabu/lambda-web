@@ -6,18 +6,12 @@
 use crate::request::ApiGatewayV2;
 use core::convert::TryFrom;
 use core::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-/*
 use lambda_runtime::{
     run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
     Handler as LambdaHandler,
 };
-*/
-use lamedh_runtime::{
-    run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
-    Handler as LambdaHandler,
-};
+use std::pin::Pin;
+use std::sync::Arc;
 
 /// Launch Rocket application on AWS Lambda
 ///
@@ -65,7 +59,7 @@ impl LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for RocketHandler {
     /// Lambda handler function
     /// Parse Lambda event as Rocket LocalRequest,
     /// serialize Rocket LocalResponse to Lambda JSON response
-    fn call(&mut self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
+    fn call(&self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
         // check if web client supports content-encoding: br

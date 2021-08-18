@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 : Not yet released
+
+* Replace lamedh\_runtime with lambda\_runtime 0.4.0
+* Update Actix-Web to 4.0.0-beta.8
+
 ## 0.1.5 : 2021-06-21
 
 * Update Actix-Web to 4.0.0-beta.7

@@ -5,17 +5,11 @@
 use crate::request::ApiGatewayV2;
 use core::convert::TryFrom;
 use core::future::Future;
-use std::pin::Pin;
-/*
 use lambda_runtime::{
     run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
     Handler as LambdaHandler,
 };
-*/
-use lamedh_runtime::{
-    run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
-    Handler as LambdaHandler,
-};
+use std::pin::Pin;
 
 /// Run Actix web application on AWS Lambda
 ///
@@ -56,7 +50,7 @@ where
         > + 'static,
     S::InitError: std::fmt::Debug,
     B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Debug,
+    B::Error: std::fmt::Display,
 {
     // Prepare actix_service::Service
     let srv = factory().into_factory();
@@ -79,7 +73,7 @@ where
             Error = actix_web::Error,
         > + 'static,
     B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Debug;
+    B::Error: std::fmt::Display;
 
 impl<S, B> LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for ActixHandler<S, B>
 where
@@ -89,15 +83,15 @@ where
             Error = actix_web::Error,
         > + 'static,
     B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Debug,
+    B::Error: std::fmt::Display,
 {
     type Error = B::Error;
-    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>> + 'static>>;
+    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
 
     /// Lambda handler function
     /// Parse Lambda event as Actix-web request,
     /// serialize Actix-web response to Lambda JSON response
-    fn call(&mut self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
+    fn call(&self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
         // check if web client supports content-encoding: br

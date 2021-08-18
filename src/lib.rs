@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pub use lamedh_runtime::Error as LambdaError;
+pub use lambda_runtime::Error as LambdaError;
 
 #[cfg(test)]
 #[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
