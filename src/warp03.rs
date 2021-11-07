@@ -223,7 +223,8 @@ mod tests {
 
     #[test]
     fn test_path_decode() {
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().path(), "/");
 
@@ -253,7 +254,8 @@ mod tests {
 
     #[test]
     fn test_query_decode() {
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().query(), Some("key=value"));
 
@@ -305,7 +307,8 @@ mod tests {
 
     #[test]
     fn test_parse_header() {
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.headers().get("x-forwarded-port").unwrap(), &"443");
         assert_eq!(req.headers().get("x-forwarded-proto").unwrap(), &"https");
@@ -313,7 +316,8 @@ mod tests {
 
     #[test]
     fn test_parse_cookies() {
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.headers().get("cookie"), None);
 
@@ -321,7 +325,8 @@ mod tests {
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.headers().get("cookie").unwrap(), &"cookie1=value1");
 
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(
             req.headers().get("cookie").unwrap(),
