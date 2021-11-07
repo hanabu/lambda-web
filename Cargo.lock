@@ -841,7 +841,7 @@ checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
 name = "lambda-web"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "actix-http",
  "actix-service",

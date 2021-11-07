@@ -11,21 +11,21 @@ Run Actix web, Rocket, Warp on AWS Lambda
 
 #### Supported
 
-* [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.8) 4.0.0-beta.8
-* [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
-* [Warp](https://crates.io/crates/warp) 0.3.1
+- [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.10) 4.0.0-beta.10
+- [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
+- [Warp](https://crates.io/crates/warp) 0.3.1
 
 ### AWS infrastructure
 
 #### Supported
 
-* [API Gateway HTTP API](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api.html) with [payload format version 2.0](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html#2.0)
+- [API Gateway HTTP API](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api.html) with [payload format version 2.0](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html#2.0)
+- API Gateway REST API
 
 #### Not supported
 
-* API Gateway HTTP API with payload format version **1.0**
-* API Gateway REST API
-* Application Load Balancer (ALB)
+- API Gateway HTTP API with payload format version **1.0**
+- Application Load Balancer (ALB)
 
 ## Example
 
@@ -39,7 +39,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.6", features=["actix4"] }
+lambda-web = { version = "0.1.7", features=["actix4"] }
 ```
 
 main.rs
@@ -83,7 +83,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.6", features=["rocket05"] }
+lambda-web = { version = "0.1.7", features=["rocket05"] }
 rocket = "0.5.0-rc.1"
 ```
 
@@ -122,7 +122,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.6", features=["warp03"] }
+lambda-web = { version = "0.1.7", features=["warp03"] }
 tokio = { version = "1" }
 ```
 
