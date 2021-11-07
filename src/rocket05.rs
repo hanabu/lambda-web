@@ -63,7 +63,7 @@ impl LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for RocketHandler {
         use serde_json::json;
 
         // check if web client supports content-encoding: br
-        let client_br = event.client_supports_br();
+        let client_br = event.client_supports_brotli();
 
         // Parse request
         let decode_result = RequestDecode::try_from(event);
@@ -112,7 +112,7 @@ impl TryFrom<LambdaHttpEvent<'_>> for RequestDecode {
 
     /// Request from API Gateway event
     fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
-        use rocket::http::{Cookie, Header, Method};
+        use rocket::http::{Header, Method};
         use std::net::IpAddr;
         use std::str::FromStr;
 

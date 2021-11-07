@@ -72,7 +72,7 @@ where
         use serde_json::json;
 
         // check if web client supports content-encoding: br
-        let client_br = event.client_supports_br();
+        let client_br = event.client_supports_brotli();
 
         // Parse request
         let warp_request = WarpRequest::try_from(event);
@@ -219,7 +219,7 @@ async fn api_gateway_response_from_warp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{request::ApiGatewayV2, test_consts::*};
+    use crate::{request::LambdaHttpEvent, test_consts::*};
 
     #[test]
     fn test_path_decode() {

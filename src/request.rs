@@ -9,8 +9,8 @@ use std::collections::HashMap;
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub(crate) enum LambdaHttpEvent<'a> {
-    ApiGatewayHttpV2(ApiGatewayV2<'a>),
-    ApiGatewayRestOrAlb(ApiGatewayRest<'a>),
+    ApiGatewayHttpV2(ApiGatewayHttpV2Event<'a>),
+    ApiGatewayRestOrAlb(ApiGatewayRestEvent<'a>),
 }
 
 impl LambdaHttpEvent<'_> {
@@ -140,7 +140,8 @@ impl LambdaHttpEvent<'_> {
 
     /// Check if HTTP client supports Brotli compression.
     /// ( Accept-Encoding contains "br" )
-    pub fn client_supports_br(&self) -> bool {
+    #[cfg(feature = "br")]
+    pub fn client_supports_brotli(&self) -> bool {
         match self {
             Self::ApiGatewayHttpV2(event) => {
                 if let Some(header_val) = event.headers.get("accept-encoding") {
@@ -181,6 +182,12 @@ impl LambdaHttpEvent<'_> {
                 }
             }
         }
+    }
+
+    // Without Brotli support, always returns false
+    #[cfg(not(feature = "br"))]
+    pub fn client_supports_brotli(&self) -> bool {
+        false
     }
 
     /// Request body
@@ -227,17 +234,17 @@ impl LambdaHttpEvent<'_> {
 /// https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ApiGatewayV2<'a> {
+pub(crate) struct ApiGatewayHttpV2Event<'a> {
     version: String,
-    pub(crate) raw_path: String,
-    pub(crate) raw_query_string: String,
-    pub(crate) cookies: Option<Vec<String>>,
-    pub(crate) headers: HashMap<String, String>,
+    raw_path: String,
+    raw_query_string: String,
+    cookies: Option<Vec<String>>,
+    headers: HashMap<String, String>,
     //#[serde(borrow)]
-    pub(crate) body: Option<Cow<'a, str>>,
+    body: Option<Cow<'a, str>>,
     #[serde(default)]
-    pub(crate) is_base64_encoded: bool,
-    pub(crate) request_context: ApiGatewayV2RequestContext,
+    is_base64_encoded: bool,
+    request_context: ApiGatewayV2RequestContext,
     // route_key: Cow<'a, str>,
     // #[serde(default)]
     // query_string_parameters: StrMap,
@@ -249,11 +256,11 @@ pub(crate) struct ApiGatewayV2<'a> {
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ApiGatewayV2RequestContext {
+struct ApiGatewayV2RequestContext {
     /// The full domain name used to invoke the API. This should be the same as the incoming Host header.
-    pub(crate) domain_name: String,
+    domain_name: String,
     /// The HTTP method used.
-    pub(crate) http: Http,
+    http: Http,
     // The API owner's AWS account ID.
     // pub account_id: String,
     // The identifier API Gateway assigns to your API.
@@ -277,11 +284,11 @@ pub(crate) struct ApiGatewayV2RequestContext {
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Http {
+struct Http {
     /// The HTTP method used. Valid values include: DELETE, GET, HEAD, OPTIONS, PATCH, POST, and PUT.
-    pub(crate) method: String,
+    method: String,
     /// The source IP address of the TCP connection making the request to API Gateway.
-    pub(crate) source_ip: String,
+    source_ip: String,
     // The request path. For example, for a non-proxy request URL of
     // `https://{rest-api-id.execute-api.{region}.amazonaws.com/{stage}/root/child`,
     // the $context.path value is `/{stage}/root/child`.
@@ -299,7 +306,7 @@ pub(crate) struct Http {
 ///
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ApiGatewayRest<'a> {
+pub(crate) struct ApiGatewayRestEvent<'a> {
     path: String,
     http_method: String,
     //#[serde(borrow)]
@@ -309,11 +316,12 @@ pub(crate) struct ApiGatewayRest<'a> {
     multi_value_headers: HashMap<String, Vec<String>>,
     #[serde(default)]
     multi_value_query_string_parameters: HashMap<String, Vec<String>>,
-    request_context: Option<ApiGatewayRestRequestContext>, // None when called from ALB
-                                                           // headers: HashMap<String, String>,
-                                                           // path_parameters: HashMap<String, String>,
-                                                           // query_string_parameters: HashMap<String, String>,
-                                                           // stage_variables: HashMap<String, String>,
+    // request_context = None when called from ALB
+    request_context: Option<ApiGatewayRestRequestContext>,
+    // headers: HashMap<String, String>,
+    // path_parameters: HashMap<String, String>,
+    // query_string_parameters: HashMap<String, String>,
+    // stage_variables: HashMap<String, String>,
 }
 
 /// API Gateway REST API request context
@@ -374,13 +382,4 @@ fn encode_path_query<'a>(pathstr: &'a str) -> Cow<'a, str> {
         pathstr,
         &RFC3986_PATH_ESCAPE_SET,
     ))
-}
-
-impl<'a> ApiGatewayV2<'a> {
-    pub(crate) fn encoded_path(&'a self) -> Cow<'a, str> {
-        Cow::from(percent_encoding::utf8_percent_encode(
-            &self.raw_path,
-            &RFC3986_PATH_ESCAPE_SET,
-        ))
-    }
 }

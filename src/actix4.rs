@@ -95,7 +95,7 @@ where
         use serde_json::json;
 
         // check if web client supports content-encoding: br
-        let client_br = event.client_supports_br();
+        let client_br = event.client_supports_brotli();
 
         // Parse request
         let actix_request = actix_http::Request::try_from(event);
