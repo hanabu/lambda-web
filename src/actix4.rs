@@ -230,31 +230,26 @@ mod tests {
     use super::*;
     use crate::{request::LambdaHttpEvent, test_consts::*};
 
+    fn prepare_request(event_str: &str) -> actix_http::Request {
+        let reqjson: LambdaHttpEvent = serde_json::from_str(event_str).unwrap();
+        actix_http::Request::try_from(reqjson).unwrap()
+    }
+
     #[test]
     fn test_path_decode() {
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         assert_eq!(req.uri().path(), "/");
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY);
         assert_eq!(req.uri().path(), "/somewhere");
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY);
         assert_eq!(req.uri().path(), "/path%20with/space");
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY);
         assert_eq!(req.uri().path(), "/path%25with/percent");
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY);
         assert_eq!(
             req.uri().path(),
             "/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
@@ -263,29 +258,19 @@ mod tests {
 
     #[test]
     fn test_query_decode() {
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_ROOT_ONEQUERY);
         assert_eq!(req.uri().query(), Some("key=value"));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY);
         assert_eq!(req.uri().query(), Some("key=value"));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY);
         assert_eq!(req.uri().query(), Some("key1=value1&key2=value2"));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY);
         assert_eq!(req.uri().query(), Some("key=value1+value2"));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY);
         assert_eq!(req.uri().query(), Some("key=%E6%97%A5%E6%9C%AC%E8%AA%9E"));
     }
 
@@ -294,17 +279,13 @@ mod tests {
         use std::net::IpAddr;
         use std::str::FromStr;
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_ROOT_ONEQUERY);
         assert_eq!(
             req.peer_addr().unwrap().ip(),
             IpAddr::from_str("1.2.3.4").unwrap()
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_REMOTE_IPV6).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_REMOTE_IPV6);
         assert_eq!(
             req.peer_addr().unwrap().ip(),
             IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
@@ -315,23 +296,17 @@ mod tests {
     async fn test_form_post() {
         use actix_web::http::Method;
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED);
         assert_eq!(req.method(), Method::POST);
 
         // Base64 encoded
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED_B64);
         assert_eq!(req.method(), Method::POST);
     }
 
     #[test]
     fn test_parse_header() {
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         assert_eq!(req.head().headers.get("x-forwarded-port").unwrap(), &"443");
         assert_eq!(
             req.head().headers.get("x-forwarded-proto").unwrap(),
@@ -341,18 +316,13 @@ mod tests {
 
     #[test]
     fn test_parse_cookies() {
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         assert_eq!(req.head().headers.get("cookie"), None);
 
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_ONE_COOKIE);
         assert_eq!(req.head().headers.get("cookie").unwrap(), &"cookie1=value1");
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
-        let req = actix_http::Request::try_from(reqjson).unwrap();
+        let req = prepare_request(API_GATEWAY_V2_GET_TWO_COOKIES);
         assert!(
             req.head().headers.get("cookie").unwrap() == &"cookie2=value2; cookie1=value1"
                 || req.head().headers.get("cookie").unwrap() == &"cookie1=value1; cookie2=value2"
