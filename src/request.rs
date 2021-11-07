@@ -22,6 +22,22 @@ impl LambdaHttpEvent<'_> {
         }
     }
 
+    /// Host name
+    pub fn hostname<'a>(&'a self) -> Option<&'a str> {
+        match self {
+            Self::ApiGatewayHttpV2(event) => Some(&event.request_context.domain_name),
+            Self::ApiGatewayRestOrAlb(event) => {
+                if let Some(context) = &event.request_context {
+                    Some(&context.domain_name)
+                } else if let Some(host_headers) = event.multi_value_headers.get("host") {
+                    host_headers.first().map(|h| h as &str)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// URL encoded path?query
     pub fn path_query(&self) -> String {
         match self {
@@ -122,23 +138,8 @@ impl LambdaHttpEvent<'_> {
         }
     }
 
-    /// Host name
-    pub fn hostname<'a>(&'a self) -> Option<&'a str> {
-        match self {
-            Self::ApiGatewayHttpV2(event) => Some(&event.request_context.domain_name),
-            Self::ApiGatewayRestOrAlb(event) => {
-                if let Some(context) = &event.request_context {
-                    Some(&context.domain_name)
-                } else if let Some(host_headers) = event.multi_value_headers.get("host") {
-                    host_headers.first().map(|h| h as &str)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    ///
+    /// Check if HTTP client supports Brotli compression.
+    /// ( Accept-Encoding contains "br" )
     pub fn client_supports_br(&self) -> bool {
         match self {
             Self::ApiGatewayHttpV2(event) => {
@@ -200,6 +201,24 @@ impl LambdaHttpEvent<'_> {
         } else {
             // empty body (GET, OPTION, etc. methods)
             Ok(Vec::new())
+        }
+    }
+
+    /// Source IP address
+    pub fn source_ip(&self) -> Option<std::net::IpAddr> {
+        use std::net::IpAddr;
+        use std::str::FromStr;
+        match self {
+            Self::ApiGatewayHttpV2(event) => {
+                IpAddr::from_str(&event.request_context.http.source_ip).ok()
+            }
+            Self::ApiGatewayRestOrAlb(event) => {
+                if let Some(context) = &event.request_context {
+                    IpAddr::from_str(&context.identity.source_ip).ok()
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -302,12 +321,12 @@ pub(crate) struct ApiGatewayRest<'a> {
 #[serde(rename_all = "camelCase")]
 struct ApiGatewayRestRequestContext {
     domain_name: String,
+    identity: ApiGatewayRestIdentity,
     // account_id: String,
     // api_id: String,
     // authorizer: HashMap<String, Value>,
     // domain_prefix: String,
     // http_method: String,
-    // identity: HashMap<String, Value>,
     // path: String,
     // protocol: String,
     // request_id: String,
@@ -316,6 +335,14 @@ struct ApiGatewayRestRequestContext {
     // resource_id: String,
     // resource_path: String,
     // stage: String,
+}
+
+/// API Gateway REST API identity
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ApiGatewayRestIdentity {
+    access_key: String,
+    source_ip: String,
 }
 
 // raw_path in API Gateway HTTP API V2 payload is percent decoded.
@@ -348,7 +375,6 @@ fn encode_path_query<'a>(pathstr: &'a str) -> Cow<'a, str> {
         &RFC3986_PATH_ESCAPE_SET,
     ))
 }
-
 
 impl<'a> ApiGatewayV2<'a> {
     pub(crate) fn encoded_path(&'a self) -> Cow<'a, str> {
