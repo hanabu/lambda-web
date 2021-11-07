@@ -26,7 +26,7 @@ impl LambdaHttpEvent<'_> {
     pub fn path_query(&self) -> String {
         match self {
             Self::ApiGatewayHttpV2(event) => {
-                let path = encode_path(&event.raw_path);
+                let path = encode_path_query(&event.raw_path);
                 let query = &event.raw_query_string as &str;
                 if query.is_empty() {
                     // No query string
@@ -37,7 +37,7 @@ impl LambdaHttpEvent<'_> {
                 }
             }
             Self::ApiGatewayRestOrAlb(event) => {
-                let path = encode_path(&event.path);
+                let path = encode_path_query(&event.path);
                 if event.multi_value_query_string_parameters.is_empty() {
                     // No query string
                     path.into_owned()
@@ -47,9 +47,9 @@ impl LambdaHttpEvent<'_> {
                         .multi_value_query_string_parameters
                         .iter()
                         .flat_map(|(k, vec)| {
-                            let k_enc = encode_query(&k);
+                            let k_enc = encode_path_query(&k);
                             vec.iter()
-                                .map(move |v| format!("{}={}", k_enc, encode_query(&v)))
+                                .map(move |v| format!("{}={}", k_enc, encode_path_query(&v)))
                         })
                         .collect::<Vec<_>>()
                         .join("&");
@@ -342,26 +342,13 @@ const RFC3986_PATH_ESCAPE_SET: &percent_encoding::AsciiSet = &percent_encoding::
     .add(b'|')
     .add(b'}');
 
-fn encode_path<'a>(pathstr: &'a str) -> Cow<'a, str> {
+fn encode_path_query<'a>(pathstr: &'a str) -> Cow<'a, str> {
     Cow::from(percent_encoding::utf8_percent_encode(
         pathstr,
         &RFC3986_PATH_ESCAPE_SET,
     ))
 }
 
-// multi_value_query_string_parameters in API Gateway REST API payload is percent decoded
-// Query containing space or UTF-8 char is
-// required to percent encoded again before passed to web frameworks
-// See RFC3986 3.4 query for valid chars.
-const RFC3986_QUERY_ESCAPE_SET: &percent_encoding::AsciiSet =
-    &RFC3986_PATH_ESCAPE_SET.add(b'/').add(b'?');
-
-fn encode_query<'a>(querystr: &'a str) -> Cow<'a, str> {
-    Cow::from(percent_encoding::utf8_percent_encode(
-        querystr,
-        &RFC3986_QUERY_ESCAPE_SET,
-    ))
-}
 
 impl<'a> ApiGatewayV2<'a> {
     pub(crate) fn encoded_path(&'a self) -> Cow<'a, str> {
