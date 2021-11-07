@@ -3,7 +3,7 @@
 //! Run Rocket on AWS Lambda
 //!
 //!
-use crate::request::ApiGatewayV2;
+use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
 use core::future::Future;
 use lambda_runtime::{
@@ -52,18 +52,18 @@ pub async fn launch_rocket_on_lambda<P: rocket::Phase>(
 /// Lambda_runtime handler for Rocket
 struct RocketHandler(Arc<rocket::local::asynchronous::Client>);
 
-impl LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for RocketHandler {
+impl LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for RocketHandler {
     type Error = rocket::Error;
     type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>> + Send>>;
 
     /// Lambda handler function
     /// Parse Lambda event as Rocket LocalRequest,
     /// serialize Rocket LocalResponse to Lambda JSON response
-    fn call(&self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
+    fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
         // check if web client supports content-encoding: br
-        let client_br = crate::brotli::client_supports_brotli(&event);
+        let client_br = event.client_supports_br();
 
         // Parse request
         let decode_result = RequestDecode::try_from(event);
@@ -107,58 +107,36 @@ struct RequestDecode {
     body: Vec<u8>,
 }
 
-impl TryFrom<ApiGatewayV2<'_>> for RequestDecode {
+impl TryFrom<LambdaHttpEvent<'_>> for RequestDecode {
     type Error = LambdaError;
 
     /// Request from API Gateway event
-    fn try_from(event: ApiGatewayV2) -> Result<Self, Self::Error> {
+    fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
         use rocket::http::{Cookie, Header, Method};
         use std::net::IpAddr;
         use std::str::FromStr;
 
         // path ? query_string
-        let path_and_query = if event.raw_query_string.is_empty() {
-            event.encoded_path().to_string()
-        } else {
-            format!("{}?{}", event.encoded_path(), event.raw_query_string)
-        };
+        let path_and_query = event.path_query();
 
         // Method, Source IP
-        let method = Method::from_str(&event.request_context.http.method as &str)
-            .map_err(|_| "InvalidMethod")?;
-        let source_ip = IpAddr::from_str(&event.request_context.http.source_ip as &str)?;
+        let method = Method::from_str(&event.method()).map_err(|_| "InvalidMethod")?;
+        let source_ip = event
+            .source_ip()
+            .unwrap_or(IpAddr::from([0u8, 0u8, 0u8, 0u8]));
 
         // Parse cookies
-        let cookies = if let Some(cookies) = event.cookies {
-            cookies
-                .iter()
-                .filter_map(|cookie| {
-                    Cookie::parse_encoded(cookie as &str)
-                        .map(|c| c.into_owned())
-                        .ok()
-                })
-                .collect::<Vec<Cookie>>()
-        } else {
-            vec![]
-        };
+        let cookies = event.cookies();
 
         // Headers
         let headers = event
-            .headers
+            .headers()
             .iter()
             .map(|(k, v)| Header::new(k.to_string(), v.to_string()))
             .collect::<Vec<Header>>();
 
         // Body
-        let body = if let Some(eventbody) = event.body {
-            if event.is_base64_encoded {
-                base64::decode(&eventbody as &str)?
-            } else {
-                Vec::<u8>::from(eventbody.into_owned())
-            }
-        } else {
-            vec![]
-        };
+        let body = event.body()?;
 
         Ok(Self {
             path_and_query,
@@ -249,7 +227,7 @@ async fn api_gateway_response_from_rocket(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{request::ApiGatewayV2, test_consts::*};
+    use crate::{request::LambdaHttpEvent, test_consts::*};
     use rocket::{async_test, local::asynchronous::Client};
     use std::path::PathBuf;
 
@@ -258,20 +236,21 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -281,7 +260,7 @@ mod tests {
             Ok(PathBuf::from("path with/space"))
         );
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -291,7 +270,7 @@ mod tests {
             Ok(PathBuf::from("path%with/percent"))
         );
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -310,14 +289,15 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/?key=value");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
         assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -325,7 +305,7 @@ mod tests {
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
         assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -339,7 +319,7 @@ mod tests {
             Ok("value2")
         );
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -349,7 +329,7 @@ mod tests {
             Ok("value1 value2")
         );
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -371,7 +351,8 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(decode.source_ip, IpAddr::from_str("1.2.3.4").unwrap());
@@ -380,7 +361,8 @@ mod tests {
             Some(IpAddr::from_str("1.2.3.4").unwrap())
         );
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_REMOTE_IPV6).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_REMOTE_IPV6).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(
@@ -400,7 +382,7 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -409,7 +391,7 @@ mod tests {
         assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
 
         // Base64 encoded
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
@@ -423,7 +405,8 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(
@@ -441,12 +424,13 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(req.inner().cookies().iter().count(), 0);
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(
@@ -454,7 +438,8 @@ mod tests {
             "value1"
         );
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
+        let reqjson: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
         let decode = RequestDecode::try_from(reqjson).unwrap();
         let req = decode.make_request(&client);
         assert_eq!(

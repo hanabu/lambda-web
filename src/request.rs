@@ -92,14 +92,14 @@ impl LambdaHttpEvent<'_> {
     }
 
     /// Cookies (percent-decoded)
-    pub fn cookies<'a>(&'a self) -> Vec<cookie::Cookie<'a>> {
+    pub fn cookies(&self) -> Vec<cookie::Cookie<'static>> {
         match self {
             Self::ApiGatewayHttpV2(event) => {
                 if let Some(cookies) = &event.cookies {
                     cookies
                         .iter()
                         .filter_map(|cookie_str| {
-                            cookie::Cookie::parse_encoded(cookie_str as &str).ok()
+                            cookie::Cookie::parse_encoded(cookie_str.clone()).ok()
                         })
                         .collect()
                 } else {
@@ -112,7 +112,7 @@ impl LambdaHttpEvent<'_> {
                     cookies
                         .iter()
                         .filter_map(|cookie_str| {
-                            cookie::Cookie::parse_encoded(cookie_str as &str).ok()
+                            cookie::Cookie::parse_encoded(cookie_str.clone()).ok()
                         })
                         .collect()
                 } else {
