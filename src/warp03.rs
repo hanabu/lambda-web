@@ -2,7 +2,7 @@
 //!
 //! Run Warp 0.3.x on AWS Lambda
 //!
-use crate::request::ApiGatewayV2;
+use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
 use core::future::Future;
 use lambda_runtime::{
@@ -57,7 +57,7 @@ where
     S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
         + 'static;
 
-impl<S> LambdaHandler<ApiGatewayV2<'_>, serde_json::Value> for WarpHandler<S>
+impl<S> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for WarpHandler<S>
 where
     S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
         + 'static,
@@ -68,11 +68,11 @@ where
     /// Lambda handler function
     /// Parse Lambda event as Warp request,
     /// serialize Warp response to Lambda JSON response
-    fn call(&self, event: ApiGatewayV2, _context: LambdaContext) -> Self::Fut {
+    fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
         // check if web client supports content-encoding: br
-        let client_br = crate::brotli::client_supports_brotli(&event);
+        let client_br = event.client_supports_br();
 
         // Parse request
         let warp_request = WarpRequest::try_from(event);
@@ -112,40 +112,31 @@ where
     }
 }
 
-impl TryFrom<ApiGatewayV2<'_>> for WarpRequest {
+impl TryFrom<LambdaHttpEvent<'_>> for WarpRequest {
     type Error = LambdaError;
 
     /// Warp Request from API Gateway event
-    fn try_from(event: ApiGatewayV2) -> Result<Self, Self::Error> {
+    fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
         use std::str::FromStr;
         use warp::http::header::{HeaderName, HeaderValue, COOKIE};
         use warp::http::Method;
 
         // URI
-        let uri = if event.raw_query_string.is_empty() {
-            format!(
-                "https://{}{}",
-                event.request_context.domain_name,
-                event.encoded_path()
-            )
-        } else {
-            format!(
-                "https://{}{}?{}",
-                event.request_context.domain_name,
-                event.encoded_path(),
-                event.raw_query_string
-            )
-        };
+        let uri = format!(
+            "https://{}{}",
+            event.hostname().unwrap_or("localhost"),
+            event.path_query()
+        );
 
         // Method
-        let method = Method::try_from(&event.request_context.http.method as &str)?;
+        let method = Method::try_from(event.method())?;
 
         // Construct warp request
         let mut reqbuilder = warp::http::Request::builder().method(method).uri(&uri);
 
         // headers
         if let Some(headers_mut) = reqbuilder.headers_mut() {
-            for (k, v) in &event.headers {
+            for (k, v) in event.headers() {
                 if let (Ok(k), Ok(v)) = (
                     HeaderName::from_str(k as &str),
                     HeaderValue::from_str(v as &str),
@@ -153,26 +144,15 @@ impl TryFrom<ApiGatewayV2<'_>> for WarpRequest {
                     headers_mut.insert(k, v);
                 }
             }
-            // Cookies
-            if let Some(cookies) = event.cookies {
-                if let Ok(cookie_value) = HeaderValue::from_str(&cookies.join(";")) {
-                    headers_mut.insert(COOKIE, cookie_value);
+            if let Some(cookie_val) = event.cookie_header_value() {
+                if let Ok(v) = HeaderValue::from_str(&cookie_val) {
+                    headers_mut.insert(COOKIE, v);
                 }
             }
         }
 
         // Body
-        let req = if let Some(eventbody) = event.body {
-            if event.is_base64_encoded {
-                // base64 decode
-                let binarybody = base64::decode(&eventbody as &str)?;
-                reqbuilder.body(warp::hyper::Body::from(binarybody))?
-            } else {
-                reqbuilder.body(warp::hyper::Body::from(eventbody.into_owned()))?
-            }
-        } else {
-            reqbuilder.body(warp::hyper::Body::empty())?
-        };
+        let req = reqbuilder.body(warp::hyper::Body::from(event.body()?))?;
 
         Ok(req)
     }
@@ -243,26 +223,26 @@ mod tests {
 
     #[test]
     fn test_path_decode() {
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().path(), "/");
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().path(), "/somewhere");
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().path(), "/path%20with/space");
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().path(), "/path%25with/percent");
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(
@@ -273,26 +253,26 @@ mod tests {
 
     #[test]
     fn test_query_decode() {
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().query(), Some("key=value"));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().query(), Some("key=value"));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().query(), Some("key1=value1&key2=value2"));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().query(), Some("key=value1+value2"));
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.uri().query(), Some("key=%E6%97%A5%E6%9C%AC%E8%AA%9E"));
@@ -303,7 +283,7 @@ mod tests {
         use warp::http::method::Method;
         use warp::hyper::body::to_bytes;
 
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.method(), Method::POST);
@@ -313,7 +293,7 @@ mod tests {
         );
 
         // Base64 encoded
-        let reqjson: ApiGatewayV2 =
+        let reqjson: LambdaHttpEvent =
             serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.method(), Method::POST);
@@ -325,7 +305,7 @@ mod tests {
 
     #[test]
     fn test_parse_header() {
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.headers().get("x-forwarded-port").unwrap(), &"443");
         assert_eq!(req.headers().get("x-forwarded-proto").unwrap(), &"https");
@@ -333,19 +313,19 @@ mod tests {
 
     #[test]
     fn test_parse_cookies() {
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.headers().get("cookie"), None);
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(req.headers().get("cookie").unwrap(), &"cookie1=value1");
 
-        let reqjson: ApiGatewayV2 = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
+        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
         let req = WarpRequest::try_from(reqjson).unwrap();
         assert_eq!(
             req.headers().get("cookie").unwrap(),
-            &"cookie2=value2;cookie1=value1"
+            &"cookie2=value2; cookie1=value1"
         );
     }
 }
