@@ -231,28 +231,29 @@ mod tests {
     use rocket::{async_test, local::asynchronous::Client};
     use std::path::PathBuf;
 
+    // Request JSON to actix_http::Request
+    fn prepare_request(event_str: &str) -> RequestDecode {
+        let reqjson: LambdaHttpEvent = serde_json::from_str(event_str).unwrap();
+        let decode = RequestDecode::try_from(reqjson).unwrap();
+        decode
+    }
+
     #[async_test]
     async fn test_path_decode() {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/path%20with/space");
         assert_eq!(
@@ -260,9 +261,7 @@ mod tests {
             Ok(PathBuf::from("path with/space"))
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/path%25with/percent");
         assert_eq!(
@@ -270,9 +269,7 @@ mod tests {
             Ok(PathBuf::from("path%with/percent"))
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(
             &decode.path_and_query,
@@ -289,25 +286,19 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_ROOT_ONEQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/?key=value");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
         assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere?key=value");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
         assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere?key1=value1&key2=value2");
         assert_eq!(
@@ -319,9 +310,7 @@ mod tests {
             Ok("value2")
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere?key=value1+value2");
         assert_eq!(
@@ -329,9 +318,7 @@ mod tests {
             Ok("value1 value2")
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY);
         let req = decode.make_request(&client);
         assert_eq!(
             &decode.path_and_query,
@@ -351,9 +338,7 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_ONEQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_ROOT_ONEQUERY);
         let req = decode.make_request(&client);
         assert_eq!(decode.source_ip, IpAddr::from_str("1.2.3.4").unwrap());
         assert_eq!(
@@ -361,9 +346,7 @@ mod tests {
             Some(IpAddr::from_str("1.2.3.4").unwrap())
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_REMOTE_IPV6).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_REMOTE_IPV6);
         let req = decode.make_request(&client);
         assert_eq!(
             decode.source_ip,
@@ -382,18 +365,14 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED);
         let req = decode.make_request(&client);
         assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
         assert_eq!(req.inner().method(), Method::Post);
         assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
 
         // Base64 encoded
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_POST_FORM_URLENCODED_B64).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED_B64);
         let req = decode.make_request(&client);
         assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
         assert_eq!(req.inner().method(), Method::Post);
@@ -405,9 +384,7 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(
             req.inner().headers().get_one("x-forwarded-port"),
@@ -424,23 +401,18 @@ mod tests {
         let rocket = rocket::build();
         let client = Client::untracked(rocket).await.unwrap();
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(req.inner().cookies().iter().count(), 0);
 
-        let reqjson: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ONE_COOKIE).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_ONE_COOKIE);
         let req = decode.make_request(&client);
         assert_eq!(
             req.inner().cookies().get("cookie1").unwrap().value(),
             "value1"
         );
 
-        let reqjson: LambdaHttpEvent =
-            serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
-        let decode = RequestDecode::try_from(reqjson).unwrap();
+        let decode = prepare_request(API_GATEWAY_V2_GET_TWO_COOKIES);
         let req = decode.make_request(&client);
         assert_eq!(
             req.inner().cookies().get("cookie1").unwrap().value(),
