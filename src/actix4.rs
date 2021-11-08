@@ -230,6 +230,7 @@ mod tests {
     use super::*;
     use crate::{request::LambdaHttpEvent, test_consts::*};
 
+    // Request JSON to actix_http::Request
     fn prepare_request(event_str: &str) -> actix_http::Request {
         let reqjson: LambdaHttpEvent = serde_json::from_str(event_str).unwrap();
         actix_http::Request::try_from(reqjson).unwrap()
