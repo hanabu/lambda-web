@@ -153,17 +153,11 @@ impl TryFrom<LambdaHttpEvent<'_>> for actix_http::Request {
             req
         };
 
-        // Cookies
-        let req = event
-            .cookies()
-            .into_iter()
-            .fold(req, |req, cookie| req.cookie(cookie));
-
         // Headers
         let req = event
             .headers()
             .into_iter()
-            .fold(req, |req, (k, v)| req.insert_header((k, v)));
+            .fold(req, |req, (k, v)| req.insert_header((k, &v as &str)));
 
         // Body
         let req = req.set_payload(event.body()?);

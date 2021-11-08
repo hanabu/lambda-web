@@ -102,7 +102,7 @@ struct RequestDecode {
     path_and_query: String,
     method: rocket::http::Method,
     source_ip: std::net::IpAddr,
-    cookies: Vec<rocket::http::Cookie<'static>>,
+    cookies: Vec<String>,
     headers: Vec<rocket::http::Header<'static>>,
     body: Vec<u8>,
 }
@@ -126,7 +126,7 @@ impl TryFrom<LambdaHttpEvent<'_>> for RequestDecode {
             .unwrap_or(IpAddr::from([0u8, 0u8, 0u8, 0u8]));
 
         // Parse cookies
-        let cookies = event.cookies();
+        let cookies = event.cookies().iter().map(|c| c.to_string()).collect();
 
         // Headers
         let headers = event
@@ -155,6 +155,8 @@ impl RequestDecode {
         &'s self,
         client: &'c rocket::local::asynchronous::Client,
     ) -> rocket::local::asynchronous::LocalRequest<'c> {
+        use rocket::http::Cookie;
+
         // path, method, remote address, body
         let req = client
             .req(self.method, &self.path_and_query)
@@ -162,10 +164,13 @@ impl RequestDecode {
             .body(&self.body);
 
         // Copy cookies
-        let req = self
-            .cookies
-            .iter()
-            .fold(req, |req, cookie| req.cookie(cookie.clone()));
+        let req = self.cookies.iter().fold(req, |req, cookie_name_val| {
+            if let Ok(cookie) = Cookie::parse_encoded(cookie_name_val) {
+                req.cookie(cookie)
+            } else {
+                req
+            }
+        });
 
         // Copy headers
         let req = self

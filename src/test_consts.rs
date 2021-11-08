@@ -556,7 +556,7 @@ pub(crate) const API_GATEWAY_REST_GET_ONE_COOKIE: &str = r###"{
 
 // Cookie: cookie1=value1; cookie2=value2
 pub(crate) const API_GATEWAY_V2_GET_TWO_COOKIES: &str = r###"{
-    "cookies":["cookie2=value2","cookie1=value1"],
+    "cookies":["cookie1=value1","cookie2=value2"],
         "headers":{
         "x-forwarded-for":"1.2.3.4",
         "x-forwarded-port":"443",

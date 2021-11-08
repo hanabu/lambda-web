@@ -53,10 +53,16 @@ impl LambdaHttpEvent<'_> {
                 }
             }
             Self::ApiGatewayRestOrAlb(event) => {
-                let path = encode_path_query(&event.path);
+                let path = if let Some(context) = &event.request_context {
+                    // API Gateway REST, request_contest.path contains stage prefix
+                    &context.path
+                } else {
+                    // ALB
+                    &event.path
+                };
                 if event.multi_value_query_string_parameters.is_empty() {
                     // No query string
-                    path.into_owned()
+                    path.clone()
                 } else {
                     // With query string
                     let querystr = event
@@ -75,66 +81,54 @@ impl LambdaHttpEvent<'_> {
         }
     }
 
-    /// Returns headers
-    pub fn headers<'a>(&'a self) -> Vec<(&'a str, &'a str)> {
+    /// HTTP headers
+    pub fn headers<'a>(&'a self) -> Vec<(&'a str, Cow<'a, str>)> {
         match self {
-            Self::ApiGatewayHttpV2(event) => event
-                .headers
-                .iter()
-                .map(|(k, v)| (k as &str, v as &str))
-                .collect(),
+            Self::ApiGatewayHttpV2(event) => {
+                let mut headers: Vec<(&'a str, Cow<'a, str>)> = event
+                    .headers
+                    .iter()
+                    .map(|(k, v)| (k as &str, Cow::from(v as &str)))
+                    .collect();
+
+                // Add cookie header
+                if let Some(cookies) = &event.cookies {
+                    let cookie_value = cookies.join("; ");
+                    headers.push(("cookie", Cow::from(cookie_value)));
+                }
+
+                headers
+            }
             Self::ApiGatewayRestOrAlb(event) => event
                 .multi_value_headers
                 .iter()
-                .flat_map(|(k, vec)| vec.iter().map(move |v| (k as &str, v as &str)))
+                .flat_map(|(k, vec)| vec.iter().map(move |v| (k as &str, Cow::from(v as &str))))
                 .collect(),
         }
     }
 
-    /// Cookies (percent-decoded)
-    pub fn cookies(&self) -> Vec<cookie::Cookie<'static>> {
+    /// Cookies
+    /// percent encoded "key=val"
+    pub fn cookies<'a>(&'a self) -> Vec<&'a str> {
         match self {
             Self::ApiGatewayHttpV2(event) => {
                 if let Some(cookies) = &event.cookies {
-                    cookies
-                        .iter()
-                        .filter_map(|cookie_str| {
-                            cookie::Cookie::parse_encoded(cookie_str.clone()).ok()
-                        })
-                        .collect()
+                    cookies.iter().map(|c| c.as_str()).collect()
                 } else {
-                    // No cookie header
                     Vec::new()
                 }
             }
             Self::ApiGatewayRestOrAlb(event) => {
-                if let Some(cookies) = event.multi_value_headers.get("cookie") {
-                    cookies
+                if let Some(cookie_headers) = event.multi_value_headers.get("cookie") {
+                    cookie_headers
                         .iter()
-                        .filter_map(|cookie_str| {
-                            cookie::Cookie::parse_encoded(cookie_str.clone()).ok()
-                        })
+                        .flat_map(|v| v.split(";"))
+                        .map(|c| c.trim())
                         .collect()
                 } else {
-                    // No cookie header
                     Vec::new()
                 }
             }
-        }
-    }
-
-    /// Single cookie header
-    pub fn cookie_header_value(&self) -> Option<String> {
-        let cookies = self.cookies();
-        if cookies.is_empty() {
-            None
-        } else {
-            let header_val = cookies
-                .iter()
-                .map(|c| c.encoded().stripped().to_string())
-                .collect::<Vec<_>>()
-                .join("; ");
-            Some(header_val)
         }
     }
 
@@ -307,6 +301,7 @@ struct Http {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ApiGatewayRestEvent<'a> {
+    // path without stage
     path: String,
     http_method: String,
     //#[serde(borrow)]
@@ -330,12 +325,13 @@ pub(crate) struct ApiGatewayRestEvent<'a> {
 struct ApiGatewayRestRequestContext {
     domain_name: String,
     identity: ApiGatewayRestIdentity,
+    // Path with stage
+    path: String,
     // account_id: String,
     // api_id: String,
     // authorizer: HashMap<String, Value>,
     // domain_prefix: String,
     // http_method: String,
-    // path: String,
     // protocol: String,
     // request_id: String,
     // request_time: String,
@@ -349,7 +345,7 @@ struct ApiGatewayRestRequestContext {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ApiGatewayRestIdentity {
-    access_key: String,
+    access_key: Option<String>,
     source_ip: String,
 }
 
@@ -382,4 +378,35 @@ fn encode_path_query<'a>(pathstr: &'a str) -> Cow<'a, str> {
         pathstr,
         &RFC3986_PATH_ESCAPE_SET,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_consts::*;
+
+    #[test]
+    fn test_decode() {
+        let _: ApiGatewayHttpV2Event =
+            serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let _: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_ROOT_NOQUERY).unwrap();
+        let _: ApiGatewayRestEvent =
+            serde_json::from_str(API_GATEWAY_REST_GET_ROOT_NOQUERY).unwrap();
+        let _: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_REST_GET_ROOT_NOQUERY).unwrap();
+    }
+
+    #[test]
+    fn test_cookie() {
+        let event: LambdaHttpEvent = serde_json::from_str(API_GATEWAY_V2_GET_TWO_COOKIES).unwrap();
+        assert_eq!(
+            event.cookies(),
+            vec!["cookie1=value1".to_string(), "cookie2=value2".to_string()]
+        );
+        let event: LambdaHttpEvent =
+            serde_json::from_str(API_GATEWAY_REST_GET_TWO_COOKIES).unwrap();
+        assert_eq!(
+            event.cookies(),
+            vec!["cookie1=value1".to_string(), "cookie2=value2".to_string()]
+        );
+    }
 }

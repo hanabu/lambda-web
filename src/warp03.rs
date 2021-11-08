@@ -118,7 +118,7 @@ impl TryFrom<LambdaHttpEvent<'_>> for WarpRequest {
     /// Warp Request from API Gateway event
     fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
         use std::str::FromStr;
-        use warp::http::header::{HeaderName, HeaderValue, COOKIE};
+        use warp::http::header::{HeaderName, HeaderValue};
         use warp::http::Method;
 
         // URI
@@ -139,14 +139,9 @@ impl TryFrom<LambdaHttpEvent<'_>> for WarpRequest {
             for (k, v) in event.headers() {
                 if let (Ok(k), Ok(v)) = (
                     HeaderName::from_str(k as &str),
-                    HeaderValue::from_str(v as &str),
+                    HeaderValue::from_str(&v as &str),
                 ) {
                     headers_mut.insert(k, v);
-                }
-            }
-            if let Some(cookie_val) = event.cookie_header_value() {
-                if let Ok(v) = HeaderValue::from_str(&cookie_val) {
-                    headers_mut.insert(COOKIE, v);
                 }
             }
         }
@@ -306,7 +301,7 @@ mod tests {
         let req = prepare_request(API_GATEWAY_V2_GET_TWO_COOKIES);
         assert_eq!(
             req.headers().get("cookie").unwrap(),
-            &"cookie2=value2; cookie1=value1"
+            &"cookie1=value1; cookie2=value2"
         );
     }
 }

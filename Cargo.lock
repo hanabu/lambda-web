@@ -848,7 +848,6 @@ dependencies = [
  "actix-web",
  "base64",
  "brotli",
- "cookie",
  "lambda_runtime",
  "percent-encoding",
  "rocket",
