@@ -240,20 +240,33 @@ mod tests {
     fn test_path_decode() {
         let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         assert_eq!(req.uri().path(), "/");
+        let req = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
+        assert_eq!(req.uri().path(), "/stage/");
 
         let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY);
         assert_eq!(req.uri().path(), "/somewhere");
+        let req = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_NOQUERY);
+        assert_eq!(req.uri().path(), "/stage/somewhere");
 
         let req = prepare_request(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY);
         assert_eq!(req.uri().path(), "/path%20with/space");
+        let req = prepare_request(API_GATEWAY_REST_GET_SPACEPATH_NOQUERY);
+        assert_eq!(req.uri().path(), "/stage/path%20with/space");
 
         let req = prepare_request(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY);
         assert_eq!(req.uri().path(), "/path%25with/percent");
+        let req = prepare_request(API_GATEWAY_REST_GET_PERCENTPATH_NOQUERY);
+        assert_eq!(req.uri().path(), "/stage/path%25with/percent");
 
         let req = prepare_request(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY);
         assert_eq!(
             req.uri().path(),
             "/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
+        );
+        let req = prepare_request(API_GATEWAY_REST_GET_UTF8PATH_NOQUERY);
+        assert_eq!(
+            req.uri().path(),
+            "/stage/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
         );
     }
 
@@ -261,17 +274,30 @@ mod tests {
     fn test_query_decode() {
         let req = prepare_request(API_GATEWAY_V2_GET_ROOT_ONEQUERY);
         assert_eq!(req.uri().query(), Some("key=value"));
+        let req = prepare_request(API_GATEWAY_REST_GET_ROOT_ONEQUERY);
+        assert_eq!(req.uri().query(), Some("key=value"));
 
         let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY);
+        assert_eq!(req.uri().query(), Some("key=value"));
+        let req = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_ONEQUERY);
         assert_eq!(req.uri().query(), Some("key=value"));
 
         let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY);
         assert_eq!(req.uri().query(), Some("key1=value1&key2=value2"));
+        let req = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_TWOQUERY);
+        assert!(
+            req.uri().query() == Some("key1=value1&key2=value2")
+                || req.uri().query() == Some("key2=value2&key1=value1")
+        );
 
         let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY);
         assert_eq!(req.uri().query(), Some("key=value1+value2"));
+        let req = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_SPACEQUERY);
+        assert_eq!(req.uri().query(), Some("key=value1%20value2"));
 
         let req = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY);
+        assert_eq!(req.uri().query(), Some("key=%E6%97%A5%E6%9C%AC%E8%AA%9E"));
+        let req = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_UTF8QUERY);
         assert_eq!(req.uri().query(), Some("key=%E6%97%A5%E6%9C%AC%E8%AA%9E"));
     }
 
@@ -285,8 +311,18 @@ mod tests {
             req.peer_addr().unwrap().ip(),
             IpAddr::from_str("1.2.3.4").unwrap()
         );
+        let req = prepare_request(API_GATEWAY_REST_GET_ROOT_ONEQUERY);
+        assert_eq!(
+            req.peer_addr().unwrap().ip(),
+            IpAddr::from_str("1.2.3.4").unwrap()
+        );
 
         let req = prepare_request(API_GATEWAY_V2_GET_REMOTE_IPV6);
+        assert_eq!(
+            req.peer_addr().unwrap().ip(),
+            IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
+        );
+        let req = prepare_request(API_GATEWAY_REST_GET_REMOTE_IPV6);
         assert_eq!(
             req.peer_addr().unwrap().ip(),
             IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
@@ -299,15 +335,25 @@ mod tests {
 
         let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED);
         assert_eq!(req.method(), Method::POST);
+        let req = prepare_request(API_GATEWAY_REST_POST_FORM_URLENCODED);
+        assert_eq!(req.method(), Method::POST);
 
         // Base64 encoded
         let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED_B64);
+        assert_eq!(req.method(), Method::POST);
+        let req = prepare_request(API_GATEWAY_REST_POST_FORM_URLENCODED_B64);
         assert_eq!(req.method(), Method::POST);
     }
 
     #[test]
     fn test_parse_header() {
         let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
+        assert_eq!(req.head().headers.get("x-forwarded-port").unwrap(), &"443");
+        assert_eq!(
+            req.head().headers.get("x-forwarded-proto").unwrap(),
+            &"https"
+        );
+        let req = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
         assert_eq!(req.head().headers.get("x-forwarded-port").unwrap(), &"443");
         assert_eq!(
             req.head().headers.get("x-forwarded-proto").unwrap(),
@@ -322,8 +368,15 @@ mod tests {
 
         let req = prepare_request(API_GATEWAY_V2_GET_ONE_COOKIE);
         assert_eq!(req.head().headers.get("cookie").unwrap(), &"cookie1=value1");
+        let req = prepare_request(API_GATEWAY_REST_GET_ONE_COOKIE);
+        assert_eq!(req.head().headers.get("cookie").unwrap(), &"cookie1=value1");
 
         let req = prepare_request(API_GATEWAY_V2_GET_TWO_COOKIES);
+        assert!(
+            req.head().headers.get("cookie").unwrap() == &"cookie2=value2; cookie1=value1"
+                || req.head().headers.get("cookie").unwrap() == &"cookie1=value1; cookie2=value2"
+        );
+        let req = prepare_request(API_GATEWAY_REST_GET_TWO_COOKIES);
         assert!(
             req.head().headers.get("cookie").unwrap() == &"cookie2=value2; cookie1=value1"
                 || req.head().headers.get("cookie").unwrap() == &"cookie1=value1; cookie2=value2"
