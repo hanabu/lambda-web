@@ -208,6 +208,7 @@ impl LambdaHttpEvent<'_> {
     }
 
     /// Source IP address
+    #[allow(dead_code)]
     pub fn source_ip(&self) -> Option<std::net::IpAddr> {
         use std::net::IpAddr;
         use std::str::FromStr;
