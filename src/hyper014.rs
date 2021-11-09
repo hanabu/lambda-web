@@ -117,9 +117,9 @@ impl TryFrom<LambdaHttpEvent<'_>> for HyperRequest {
 
     /// hyper Request from API Gateway event
     fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
-        use std::str::FromStr;
         use hyper::header::{HeaderName, HeaderValue};
         use hyper::Method;
+        use std::str::FromStr;
 
         // URI
         let uri = format!(
@@ -290,8 +290,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_form_post() {
-        use hyper::Method;
         use hyper::body::to_bytes;
+        use hyper::Method;
 
         let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED);
         assert_eq!(req.method(), Method::POST);
