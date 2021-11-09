@@ -252,11 +252,22 @@ mod tests {
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
+        let decode = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/stage/");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("stage")));
 
         let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
+        let decode = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/stage/somewhere");
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("stage/somewhere"))
+        );
 
         let decode = prepare_request(API_GATEWAY_V2_GET_SPACEPATH_NOQUERY);
         let req = decode.make_request(&client);
@@ -265,6 +276,13 @@ mod tests {
             req.inner().segments(0..),
             Ok(PathBuf::from("path with/space"))
         );
+        let decode = prepare_request(API_GATEWAY_REST_GET_SPACEPATH_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/stage/path%20with/space");
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("stage/path with/space"))
+        );
 
         let decode = prepare_request(API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY);
         let req = decode.make_request(&client);
@@ -272,6 +290,13 @@ mod tests {
         assert_eq!(
             req.inner().segments(0..),
             Ok(PathBuf::from("path%with/percent"))
+        );
+        let decode = prepare_request(API_GATEWAY_REST_GET_PERCENTPATH_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/stage/path%25with/percent");
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("stage/path%with/percent"))
         );
 
         let decode = prepare_request(API_GATEWAY_V2_GET_UTF8PATH_NOQUERY);
@@ -283,6 +308,16 @@ mod tests {
         assert_eq!(
             req.inner().segments(0..),
             Ok(PathBuf::from("日本語/ファイル名"))
+        );
+        let decode = prepare_request(API_GATEWAY_REST_GET_UTF8PATH_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(
+            &decode.path_and_query,
+            "/stage/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D"
+        );
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("stage/日本語/ファイル名"))
         );
     }
 
@@ -296,16 +331,38 @@ mod tests {
         assert_eq!(&decode.path_and_query, "/?key=value");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::new()));
         assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
+        let decode = prepare_request(API_GATEWAY_REST_GET_ROOT_ONEQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/stage/?key=value");
+        assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("stage")));
+        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
 
         let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY);
         let req = decode.make_request(&client);
         assert_eq!(&decode.path_and_query, "/somewhere?key=value");
         assert_eq!(req.inner().segments(0..), Ok(PathBuf::from("somewhere")));
         assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
+        let decode = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_ONEQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.path_and_query, "/stage/somewhere?key=value");
+        assert_eq!(
+            req.inner().segments(0..),
+            Ok(PathBuf::from("stage/somewhere"))
+        );
+        assert_eq!(req.inner().query_value::<&str>("key").unwrap(), Ok("value"));
 
         let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY);
         let req = decode.make_request(&client);
-        assert_eq!(&decode.path_and_query, "/somewhere?key1=value1&key2=value2");
+        assert_eq!(
+            req.inner().query_value::<&str>("key1").unwrap(),
+            Ok("value1")
+        );
+        assert_eq!(
+            req.inner().query_value::<&str>("key2").unwrap(),
+            Ok("value2")
+        );
+        let decode = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_TWOQUERY);
+        let req = decode.make_request(&client);
         assert_eq!(
             req.inner().query_value::<&str>("key1").unwrap(),
             Ok("value1")
@@ -317,7 +374,12 @@ mod tests {
 
         let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY);
         let req = decode.make_request(&client);
-        assert_eq!(&decode.path_and_query, "/somewhere?key=value1+value2");
+        assert_eq!(
+            req.inner().query_value::<&str>("key").unwrap(),
+            Ok("value1 value2")
+        );
+        let decode = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_SPACEQUERY);
+        let req = decode.make_request(&client);
         assert_eq!(
             req.inner().query_value::<&str>("key").unwrap(),
             Ok("value1 value2")
@@ -326,9 +388,11 @@ mod tests {
         let decode = prepare_request(API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY);
         let req = decode.make_request(&client);
         assert_eq!(
-            &decode.path_and_query,
-            "/somewhere?key=%E6%97%A5%E6%9C%AC%E8%AA%9E"
+            req.inner().query_value::<&str>("key").unwrap(),
+            Ok("日本語")
         );
+        let decode = prepare_request(API_GATEWAY_REST_GET_SOMEWHERE_UTF8QUERY);
+        let req = decode.make_request(&client);
         assert_eq!(
             req.inner().query_value::<&str>("key").unwrap(),
             Ok("日本語")
@@ -350,8 +414,25 @@ mod tests {
             req.inner().client_ip(),
             Some(IpAddr::from_str("1.2.3.4").unwrap())
         );
+        let decode = prepare_request(API_GATEWAY_REST_GET_ROOT_ONEQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(decode.source_ip, IpAddr::from_str("1.2.3.4").unwrap());
+        assert_eq!(
+            req.inner().client_ip(),
+            Some(IpAddr::from_str("1.2.3.4").unwrap())
+        );
 
         let decode = prepare_request(API_GATEWAY_V2_GET_REMOTE_IPV6);
+        let req = decode.make_request(&client);
+        assert_eq!(
+            decode.source_ip,
+            IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
+        );
+        assert_eq!(
+            req.inner().client_ip(),
+            Some(IpAddr::from_str("2404:6800:400a:80c::2004").unwrap())
+        );
+        let decode = prepare_request(API_GATEWAY_REST_GET_REMOTE_IPV6);
         let req = decode.make_request(&client);
         assert_eq!(
             decode.source_ip,
@@ -375,9 +456,19 @@ mod tests {
         assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
         assert_eq!(req.inner().method(), Method::Post);
         assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
+        let decode = prepare_request(API_GATEWAY_REST_POST_FORM_URLENCODED);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
+        assert_eq!(req.inner().method(), Method::Post);
+        assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
 
         // Base64 encoded
         let decode = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED_B64);
+        let req = decode.make_request(&client);
+        assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
+        assert_eq!(req.inner().method(), Method::Post);
+        assert_eq!(req.inner().content_type(), Some(&ContentType::Form));
+        let decode = prepare_request(API_GATEWAY_REST_POST_FORM_URLENCODED_B64);
         let req = decode.make_request(&client);
         assert_eq!(&decode.body, b"key1=value1&key2=value2&Ok=Ok");
         assert_eq!(req.inner().method(), Method::Post);
@@ -399,6 +490,16 @@ mod tests {
             req.inner().headers().get_one("x-forwarded-proto"),
             Some("https")
         );
+        let decode = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(
+            req.inner().headers().get_one("x-forwarded-port"),
+            Some("443")
+        );
+        assert_eq!(
+            req.inner().headers().get_one("x-forwarded-proto"),
+            Some("https")
+        );
     }
 
     #[async_test]
@@ -409,6 +510,9 @@ mod tests {
         let decode = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
         let req = decode.make_request(&client);
         assert_eq!(req.inner().cookies().iter().count(), 0);
+        let decode = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
+        let req = decode.make_request(&client);
+        assert_eq!(req.inner().cookies().iter().count(), 0);
 
         let decode = prepare_request(API_GATEWAY_V2_GET_ONE_COOKIE);
         let req = decode.make_request(&client);
@@ -416,8 +520,24 @@ mod tests {
             req.inner().cookies().get("cookie1").unwrap().value(),
             "value1"
         );
+        let decode = prepare_request(API_GATEWAY_REST_GET_ONE_COOKIE);
+        let req = decode.make_request(&client);
+        assert_eq!(
+            req.inner().cookies().get("cookie1").unwrap().value(),
+            "value1"
+        );
 
         let decode = prepare_request(API_GATEWAY_V2_GET_TWO_COOKIES);
+        let req = decode.make_request(&client);
+        assert_eq!(
+            req.inner().cookies().get("cookie1").unwrap().value(),
+            "value1"
+        );
+        assert_eq!(
+            req.inner().cookies().get("cookie2").unwrap().value(),
+            "value2"
+        );
+        let decode = prepare_request(API_GATEWAY_REST_GET_TWO_COOKIES);
         let req = decode.make_request(&client);
         assert_eq!(
             req.inner().cookies().get("cookie1").unwrap().value(),

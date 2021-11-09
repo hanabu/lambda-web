@@ -23,6 +23,7 @@ impl LambdaHttpEvent<'_> {
     }
 
     /// Host name
+    #[allow(dead_code)]
     pub fn hostname<'a>(&'a self) -> Option<&'a str> {
         match self {
             Self::ApiGatewayHttpV2(event) => Some(&event.request_context.domain_name),
@@ -109,6 +110,7 @@ impl LambdaHttpEvent<'_> {
 
     /// Cookies
     /// percent encoded "key=val"
+    #[allow(dead_code)]
     pub fn cookies<'a>(&'a self) -> Vec<&'a str> {
         match self {
             Self::ApiGatewayHttpV2(event) => {
