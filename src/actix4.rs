@@ -96,6 +96,8 @@ where
 
         // check if web client supports content-encoding: br
         let client_br = event.client_supports_brotli();
+        // multi-value-headers response format
+        let multi_value = event.multi_value();
 
         // Parse request
         let actix_request = actix_http::Request::try_from(event);
@@ -109,7 +111,7 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_actix_web(response, client_br).await
+                        api_gateway_response_from_actix_web(response, client_br, multi_value).await
                     } else {
                         // Some Actix web error -> 500 Internal Server Error
                         Ok(json!({
@@ -186,18 +188,37 @@ impl<B> crate::brotli::ResponseCompression for actix_web::dev::ServiceResponse<B
 async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
     response: actix_web::dev::ServiceResponse<B>,
     client_support_br: bool,
+    multi_value: bool,
 ) -> Result<serde_json::Value, B::Error> {
     use crate::brotli::ResponseCompression;
+    use actix_web::http::header::SET_COOKIE;
     use serde_json::json;
 
     // HTTP status
     let status_code = response.status().as_u16();
 
     // Convert header to JSON map
+    let mut cookies = Vec::<String>::new();
     let mut headers = serde_json::Map::new();
     for (k, v) in response.headers() {
         if let Ok(value_str) = v.to_str() {
-            headers.insert(k.as_str().to_string(), json!(value_str));
+            if multi_value {
+                // REST API format, returns multiValueHeaders
+                if let Some(values) = headers.get_mut(k.as_str()) {
+                    if let Some(value_ary) = values.as_array_mut() {
+                        value_ary.push(json!(value_str));
+                    }
+                } else {
+                    headers.insert(k.as_str().to_string(), json!([value_str]));
+                }
+            } else {
+                // HTTP API v2 format, returns headers
+                if k == SET_COOKIE {
+                    cookies.push(value_str.to_string());
+                } else {
+                    headers.insert(k.as_str().to_string(), json!(value_str));
+                }
+            }
         }
     }
 
@@ -205,18 +226,32 @@ async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
     let compress = client_support_br && response.can_brotli_compress();
     let body_bytes = actix_web::body::to_bytes(response.into_body()).await?;
     let body_base64 = if compress {
-        headers.insert("content-encoding".to_string(), json!("br"));
+        if multi_value {
+            headers.insert("content-encoding".to_string(), json!(["br"]));
+        } else {
+            headers.insert("content-encoding".to_string(), json!("br"));
+        }
         crate::brotli::compress_response_body(&body_bytes)
     } else {
         base64::encode(body_bytes)
     };
 
-    Ok(json!({
-        "isBase64Encoded": true,
-        "statusCode": status_code,
-        "headers": headers,
-        "body": body_base64
-    }))
+    if multi_value {
+        Ok(json!({
+            "isBase64Encoded": true,
+            "statusCode": status_code,
+            "multiValueHeaders": headers,
+            "body": body_base64
+        }))
+    } else {
+        Ok(json!({
+            "isBase64Encoded": true,
+            "statusCode": status_code,
+            "cookies": cookies,
+            "headers": headers,
+            "body": body_base64
+        }))
+    }
 }
 
 #[cfg(test)]

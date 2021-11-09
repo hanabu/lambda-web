@@ -186,6 +186,14 @@ impl LambdaHttpEvent<'_> {
         false
     }
 
+    /// Is request & response use multi-value-header
+    pub fn multi_value(&self) -> bool {
+        match self {
+            Self::ApiGatewayHttpV2(_) => false,
+            Self::ApiGatewayRestOrAlb(_) => true,
+        }
+    }
+
     /// Request body
     pub fn body(self) -> Result<Vec<u8>, base64::DecodeError> {
         let (body, b64_encoded) = match self {
