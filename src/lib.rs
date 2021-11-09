@@ -2,12 +2,12 @@
 pub use lambda_runtime::Error as LambdaError;
 
 #[cfg(test)]
-#[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
+#[cfg(any(feature = "actix4", feature = "rocket05", feature = "hyper"))]
 mod test_consts;
 
-#[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
+#[cfg(any(feature = "actix4", feature = "rocket05", feature = "hyper"))]
 pub(crate) mod brotli;
-#[cfg(any(feature = "actix4", feature = "rocket05", feature = "warp03"))]
+#[cfg(any(feature = "actix4", feature = "rocket05", feature = "hyper"))]
 mod request;
 
 #[cfg(feature = "actix4")]
@@ -24,11 +24,11 @@ pub use rocket;
 #[cfg(feature = "rocket05")]
 pub use rocket05::launch_rocket_on_lambda;
 
-#[cfg(feature = "warp03")]
+#[cfg(feature = "hyper")]
 mod warp03;
-#[cfg(feature = "warp03")]
-pub use warp;
-#[cfg(feature = "warp03")]
+#[cfg(feature = "hyper")]
+pub use hyper;
+#[cfg(feature = "hyper")]
 pub use warp03::run_warp_on_lambda;
 
 /// Returns true if it is running on AWS Lambda

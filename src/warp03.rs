@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //!
-//! Run Warp 0.3.x on AWS Lambda
+//! Run hyper based web framework on AWS Lambda
 //!
 use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
@@ -13,13 +13,13 @@ use std::cell::RefCell;
 use std::convert::Infallible;
 use std::pin::Pin;
 
-type WarpRequest = warp::http::Request<warp::hyper::Body>;
-type WarpResponse = warp::http::Response<warp::hyper::Body>;
+type HyperRequest = hyper::Request<hyper::Body>;
+type HyperResponse = hyper::Response<hyper::Body>;
 
 /// Run Warp application on AWS Lambda
 ///
 /// ```no_run
-/// use lambda_web::warp::{self, Filter};
+/// use warp::{self, Filter};
 /// use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
 ///
 /// #[tokio::main]
@@ -43,31 +43,31 @@ type WarpResponse = warp::http::Response<warp::hyper::Body>;
 ///
 pub async fn run_warp_on_lambda<S>(svc: S) -> Result<(), LambdaError>
 where
-    S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
         + 'static,
 {
-    lambda_runtime_run(WarpHandler(RefCell::new(svc))).await?;
+    lambda_runtime_run(HyperHandler(RefCell::new(svc))).await?;
 
     Ok(())
 }
 
-/// Lambda_runtime handler for Warp
-struct WarpHandler<S>(RefCell<S>)
+/// Lambda_runtime handler for hyper
+struct HyperHandler<S>(RefCell<S>)
 where
-    S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
         + 'static;
 
-impl<S> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for WarpHandler<S>
+impl<S> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for HyperHandler<S>
 where
-    S: warp::hyper::service::Service<WarpRequest, Response = WarpResponse, Error = Infallible>
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
         + 'static,
 {
     type Error = LambdaError;
     type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
 
     /// Lambda handler function
-    /// Parse Lambda event as Warp request,
-    /// serialize Warp response to Lambda JSON response
+    /// Parse Lambda event as hyper request,
+    /// serialize hyper response to Lambda JSON response
     fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
@@ -75,10 +75,10 @@ where
         let client_br = event.client_supports_brotli();
 
         // Parse request
-        let warp_request = WarpRequest::try_from(event);
+        let hyper_request = HyperRequest::try_from(event);
 
-        // Call Warp service when request parsing succeeded
-        let svc_call = warp_request.map(|req| self.0.borrow_mut().call(req));
+        // Call hyper service when request parsing succeeded
+        let svc_call = hyper_request.map(|req| self.0.borrow_mut().call(req));
 
         let fut = async move {
             match svc_call {
@@ -86,9 +86,9 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_warp(response, client_br).await
+                        api_gateway_response_from_hyper(response, client_br).await
                     } else {
-                        // Some Warp error -> 500 Internal Server Error
+                        // Some hyper error -> 500 Internal Server Error
                         Ok(json!({
                             "isBase64Encoded": false,
                             "statusCode": 500u16,
@@ -112,14 +112,14 @@ where
     }
 }
 
-impl TryFrom<LambdaHttpEvent<'_>> for WarpRequest {
+impl TryFrom<LambdaHttpEvent<'_>> for HyperRequest {
     type Error = LambdaError;
 
-    /// Warp Request from API Gateway event
+    /// hyper Request from API Gateway event
     fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
         use std::str::FromStr;
-        use warp::http::header::{HeaderName, HeaderValue};
-        use warp::http::Method;
+        use hyper::header::{HeaderName, HeaderValue};
+        use hyper::Method;
 
         // URI
         let uri = format!(
@@ -131,8 +131,8 @@ impl TryFrom<LambdaHttpEvent<'_>> for WarpRequest {
         // Method
         let method = Method::try_from(event.method())?;
 
-        // Construct warp request
-        let mut reqbuilder = warp::http::Request::builder().method(method).uri(&uri);
+        // Construct hyper request
+        let mut reqbuilder = hyper::Request::builder().method(method).uri(&uri);
 
         // headers
         if let Some(headers_mut) = reqbuilder.headers_mut() {
@@ -147,31 +147,31 @@ impl TryFrom<LambdaHttpEvent<'_>> for WarpRequest {
         }
 
         // Body
-        let req = reqbuilder.body(warp::hyper::Body::from(event.body()?))?;
+        let req = reqbuilder.body(hyper::Body::from(event.body()?))?;
 
         Ok(req)
     }
 }
 
-impl crate::brotli::ResponseCompression for WarpResponse {
+impl crate::brotli::ResponseCompression for HyperResponse {
     /// Content-Encoding header value
     fn content_encoding<'a>(&'a self) -> Option<&'a str> {
         self.headers()
-            .get(warp::hyper::header::CONTENT_ENCODING)
+            .get(hyper::header::CONTENT_ENCODING)
             .and_then(|val| val.to_str().ok())
     }
 
     /// Content-Type header value
     fn content_type<'a>(&'a self) -> Option<&'a str> {
         self.headers()
-            .get(warp::hyper::header::CONTENT_TYPE)
+            .get(hyper::header::CONTENT_TYPE)
             .and_then(|val| val.to_str().ok())
     }
 }
 
-/// API Gateway response from Warp response
-async fn api_gateway_response_from_warp(
-    response: WarpResponse,
+/// API Gateway response from hyper response
+async fn api_gateway_response_from_hyper(
+    response: HyperResponse,
     client_support_br: bool,
 ) -> Result<serde_json::Value, LambdaError> {
     use crate::brotli::ResponseCompression;
@@ -195,7 +195,7 @@ async fn api_gateway_response_from_warp(
     }
 
     // Compress, base64 encode the response body
-    let body_bytes = warp::hyper::body::to_bytes(res_body).await?;
+    let body_bytes = hyper::body::to_bytes(res_body).await?;
     let body_base64 = if compress {
         headers.insert("content-encoding".to_string(), json!("br"));
         crate::brotli::compress_response_body(&body_bytes)
@@ -217,9 +217,9 @@ mod tests {
     use crate::{request::LambdaHttpEvent, test_consts::*};
 
     // Request JSON string to http::Request
-    fn prepare_request(event_str: &str) -> WarpRequest {
+    fn prepare_request(event_str: &str) -> HyperRequest {
         let reqjson: LambdaHttpEvent = serde_json::from_str(event_str).unwrap();
-        let req = WarpRequest::try_from(reqjson).unwrap();
+        let req = HyperRequest::try_from(reqjson).unwrap();
         req
     }
 
@@ -290,8 +290,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_form_post() {
-        use warp::http::method::Method;
-        use warp::hyper::body::to_bytes;
+        use hyper::Method;
+        use hyper::body::to_bytes;
 
         let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED);
         assert_eq!(req.method(), Method::POST);

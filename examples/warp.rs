@@ -1,4 +1,4 @@
-use lambda_web::warp::{self, Filter};
+use warp::{self, Filter};
 use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
 
 #[tokio::main]

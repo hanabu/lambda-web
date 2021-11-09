@@ -123,6 +123,7 @@ path = "src/main.rs"
 
 [dependencies]
 lambda-web = { version = "0.1.7", features=["warp03"] }
+warp = "0.3"
 tokio = { version = "1" }
 ```
 
