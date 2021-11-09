@@ -61,13 +61,9 @@ impl LambdaHttpEvent<'_> {
                     // ALB
                     &event.path
                 };
-                if event.multi_value_query_string_parameters.is_empty() {
-                    // No query string
-                    path.clone()
-                } else {
+                if let Some(query_string_parameters) = &event.multi_value_query_string_parameters {
                     // With query string
-                    let querystr = event
-                        .multi_value_query_string_parameters
+                    let querystr = query_string_parameters
                         .iter()
                         .flat_map(|(k, vec)| {
                             let k_enc = encode_path_query(&k);
@@ -77,6 +73,9 @@ impl LambdaHttpEvent<'_> {
                         .collect::<Vec<_>>()
                         .join("&");
                     format!("{}?{}", path, querystr)
+                } else {
+                    // No query string
+                    path.clone()
                 }
             }
         }
@@ -321,7 +320,7 @@ pub(crate) struct ApiGatewayRestEvent<'a> {
     is_base64_encoded: bool,
     multi_value_headers: HashMap<String, Vec<String>>,
     #[serde(default)]
-    multi_value_query_string_parameters: HashMap<String, Vec<String>>,
+    multi_value_query_string_parameters: Option<HashMap<String, Vec<String>>>,
     // request_context = None when called from ALB
     request_context: Option<ApiGatewayRestRequestContext>,
     // headers: HashMap<String, String>,

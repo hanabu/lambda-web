@@ -22,6 +22,7 @@ pub(crate) const API_GATEWAY_V2_GET_ROOT_NOQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_ROOT_NOQUERY: &str = r###"{
+    "body":null,
     "path":"/",
     "httpMethod":"GET",
     "headers":{
@@ -34,8 +35,8 @@ pub(crate) const API_GATEWAY_REST_GET_ROOT_NOQUERY: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/",
@@ -65,6 +66,7 @@ pub(crate) const API_GATEWAY_V2_GET_SOMEWHERE_NOQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_SOMEWHERE_NOQUERY: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -77,8 +79,8 @@ pub(crate) const API_GATEWAY_REST_GET_SOMEWHERE_NOQUERY: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/somewhere",
@@ -108,6 +110,7 @@ pub(crate) const API_GATEWAY_V2_GET_SPACEPATH_NOQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_SPACEPATH_NOQUERY: &str = r###"{
+    "body":null,
     "path":"/path%20with/space",
     "httpMethod":"GET",
     "headers":{
@@ -120,8 +123,8 @@ pub(crate) const API_GATEWAY_REST_GET_SPACEPATH_NOQUERY: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/path%20with/space",        
@@ -151,6 +154,7 @@ pub(crate) const API_GATEWAY_V2_GET_PERCENTPATH_NOQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_PERCENTPATH_NOQUERY: &str = r###"{
+    "body":null,
     "path":"/path%25with/percent",
     "httpMethod":"GET",
     "headers":{
@@ -163,8 +167,8 @@ pub(crate) const API_GATEWAY_REST_GET_PERCENTPATH_NOQUERY: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/path%25with/percent",        
@@ -194,6 +198,7 @@ pub(crate) const API_GATEWAY_V2_GET_UTF8PATH_NOQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_UTF8PATH_NOQUERY: &str = r###"{
+    "body":null,
     "path":"/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D",
     "httpMethod":"GET",
     "headers":{
@@ -206,8 +211,8 @@ pub(crate) const API_GATEWAY_REST_GET_UTF8PATH_NOQUERY: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/%E6%97%A5%E6%9C%AC%E8%AA%9E/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D",        
@@ -241,6 +246,7 @@ pub(crate) const API_GATEWAY_V2_GET_ROOT_ONEQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_ROOT_ONEQUERY: &str = r###"{
+    "body":null,
     "path":"/",
     "httpMethod":"GET",
     "headers":{
@@ -288,6 +294,7 @@ pub(crate) const API_GATEWAY_V2_GET_SOMEWHERE_ONEQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_SOMEWHERE_ONEQUERY: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -335,6 +342,7 @@ pub(crate) const API_GATEWAY_V2_GET_SOMEWHERE_TWOQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_SOMEWHERE_TWOQUERY: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -384,6 +392,7 @@ pub(crate) const API_GATEWAY_V2_GET_SOMEWHERE_SPACEQUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_SOMEWHERE_SPACEQUERY: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -431,6 +440,7 @@ pub(crate) const API_GATEWAY_V2_GET_SOMEWHERE_UTF8QUERY: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_SOMEWHERE_UTF8QUERY: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -481,6 +491,7 @@ pub(crate) const API_GATEWAY_V2_GET_REMOTE_IPV6: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_REMOTE_IPV6: &str = r###"{
+    "body":null,
     "path":"/",
     "httpMethod":"GET",
     "headers":{
@@ -493,8 +504,8 @@ pub(crate) const API_GATEWAY_REST_GET_REMOTE_IPV6: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/",
@@ -529,6 +540,7 @@ pub(crate) const API_GATEWAY_V2_GET_ONE_COOKIE: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_ONE_COOKIE: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -543,8 +555,8 @@ pub(crate) const API_GATEWAY_REST_GET_ONE_COOKIE: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/somewhere",
@@ -575,6 +587,7 @@ pub(crate) const API_GATEWAY_V2_GET_TWO_COOKIES: &str = r###"{
     "version":"2.0"
 }"###;
 pub(crate) const API_GATEWAY_REST_GET_TWO_COOKIES: &str = r###"{
+    "body":null,
     "path":"/somewhere",
     "httpMethod":"GET",
     "headers":{
@@ -589,8 +602,8 @@ pub(crate) const API_GATEWAY_REST_GET_TWO_COOKIES: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/somewhere",
@@ -645,8 +658,8 @@ pub(crate) const API_GATEWAY_REST_POST_FORM_URLENCODED: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/somewhere",
@@ -697,8 +710,8 @@ pub(crate) const API_GATEWAY_REST_POST_FORM_URLENCODED_B64: &str = r###"{
         "x-forwarded-port":["443"],
         "x-forwarded-proto":["https"]
     },
-    "queryStringParameters":{},
-    "multiValueQueryStringParameters":{},
+    "queryStringParameters":null,
+    "multiValueQueryStringParameters":null,
     "requestContext":{
         "domainName":"yyyyyyyyyy.execute-api.ap-northeast-1.amazonaws.com",
         "path":"/stage/somewhere",
