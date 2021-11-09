@@ -64,6 +64,8 @@ impl LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for RocketHandler {
 
         // check if web client supports content-encoding: br
         let client_br = event.client_supports_brotli();
+        // multi-value-headers response format
+        let multi_value = event.multi_value();
 
         // Parse request
         let decode_result = RequestDecode::try_from(event);
@@ -78,7 +80,7 @@ impl LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for RocketHandler {
                     let response = local_request.dispatch().await;
 
                     // Return response as API Gateway JSON
-                    api_gateway_response_from_rocket(response, client_br).await
+                    api_gateway_response_from_rocket(response, client_br, multi_value).await
                 }
                 Err(_request_err) => {
                     // Request parsing error
@@ -198,6 +200,7 @@ impl crate::brotli::ResponseCompression for rocket::local::asynchronous::LocalRe
 async fn api_gateway_response_from_rocket(
     response: rocket::local::asynchronous::LocalResponse<'_>,
     client_support_br: bool,
+    multi_value: bool,
 ) -> Result<serde_json::Value, rocket::Error> {
     use crate::brotli::ResponseCompression;
     use serde_json::json;
@@ -206,27 +209,60 @@ async fn api_gateway_response_from_rocket(
     let status_code = response.status().code;
 
     // Convert header to JSON map
+    let mut cookies = Vec::<String>::new();
     let mut headers = serde_json::Map::new();
     for header in response.headers().iter() {
-        headers.insert(header.name.into_string(), json!(header.value));
+        let header_name = header.name.into_string();
+        let header_value = header.value.into_owned();
+        if multi_value {
+            // REST API format, returns multiValueHeaders
+            if let Some(values) = headers.get_mut(&header_name) {
+                if let Some(value_ary) = values.as_array_mut() {
+                    value_ary.push(json!(header_value));
+                }
+            } else {
+                headers.insert(header_name, json!([header_value]));
+            }
+        } else {
+            // HTTP API v2 format, returns headers
+            if &header_name == "set-cookie" {
+                cookies.push(header_value);
+            } else {
+                headers.insert(header_name, json!(header_value));
+            }
+        }
     }
 
     // check if response should be compressed
     let compress = client_support_br && response.can_brotli_compress();
     let body_bytes = response.into_bytes().await.unwrap_or_default();
     let body_base64 = if compress {
-        headers.insert("content-encoding".to_string(), json!("br"));
+        if multi_value {
+            headers.insert("content-encoding".to_string(), json!(["br"]));
+        } else {
+            headers.insert("content-encoding".to_string(), json!("br"));
+        }
         crate::brotli::compress_response_body(&body_bytes)
     } else {
         base64::encode(body_bytes)
     };
 
-    Ok(json!({
-        "isBase64Encoded": true,
-        "statusCode": status_code,
-        "headers": headers,
-        "body": body_base64
-    }))
+    if multi_value {
+        Ok(json!({
+            "isBase64Encoded": true,
+            "statusCode": status_code,
+            "multiValueHeaders": headers,
+            "body": body_base64
+        }))
+    } else {
+        Ok(json!({
+            "isBase64Encoded": true,
+            "statusCode": status_code,
+            "cookies": cookies,
+            "headers": headers,
+            "body": body_base64
+        }))
+    }
 }
 
 #[cfg(test)]
