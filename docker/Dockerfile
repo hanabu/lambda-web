@@ -8,7 +8,7 @@ RUN mkdir -p /build/src && \
 # Add required packages
     yum install -y awscli gcc openssl-devel tree zip && \
 # Install rust with rustup
-    curl https://sh.rustup.rs > rustup.sh && sh ./rustup.sh -y
+    curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 
 # Build environment setting
 WORKDIR /build

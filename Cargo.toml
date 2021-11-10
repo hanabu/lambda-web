@@ -1,6 +1,6 @@
 [package]
 name = "lambda-web"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Hanabusa Masahiro"]
 description = "Run Rust web frameworks on AWS Lambda"
 edition = "2018"
@@ -20,24 +20,24 @@ default = ["br"]
 # Enable one of your favorite web-framework
 actix4 = ["actix-web", "actix-http", "actix-service"]
 rocket05 = ["rocket"]
-warp03 = ["warp"]
+warp03 = ["hyper", "warp"]
 
 # Compress output with Brotli
 br = ["brotli"]
 
 [dependencies]
-lambda_runtime = "0.4.0"
+lambda_runtime = "0.4.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.13"
 percent-encoding = "2"
 
-actix-web = { version = "4.0.0-beta.8", default-features = false, features = ["cookies"], optional = true }
-actix-http = { version = "3.0.0-beta.9", default-features = false, optional = true }
+hyper = { version = "0.14", default-features = false, features = [], optional = true }
+actix-web = { version = "4.0.0-beta.10", default-features = false, features = ["cookies"], optional = true }
+actix-http = { version = "3.0.0-beta.11", default-features = false, optional = true }
 actix-service = { version = "2", optional = true }
 rocket = { version = "0.5.0-rc.1", default-features = false, optional = true }
 warp = { version = "0.3.1", default-features = false, optional = true }
-
 brotli = { version = "3", features = ["std"], optional = true }
 
 [dev-dependencies]

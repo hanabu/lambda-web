@@ -48,32 +48,6 @@ pub(crate) trait ResponseCompression {
     }
 }
 
-/// Does web client support Brotli content transfer encoding?
-#[cfg(feature = "br")]
-pub(crate) fn client_supports_brotli(req: &crate::request::ApiGatewayV2<'_>) -> bool {
-    if let Some(header_val) = req.headers.get("accept-encoding") {
-        for elm in header_val.to_ascii_lowercase().split(',') {
-            if let Some(algo_name) = elm.split(';').next() {
-                // first part of elm, contains 'br', 'gzip', etc.
-                if algo_name.trim() == "br" {
-                    // HTTP client support Brotli compression
-                    return true;
-                }
-            }
-        }
-        false
-    } else {
-        // No Accept-Encoding header
-        false
-    }
-}
-
-// Without Brotli support, always returns false
-#[cfg(not(feature = "br"))]
-pub(crate) fn client_supports_brotli(_req: &crate::request::ApiGatewayV2<'_>) -> bool {
-    false
-}
-
 /// Compress response using Brotli, base64 encode it, and return encoded string.
 #[cfg(feature = "br")]
 pub(crate) fn compress_response_body<'a>(body: &[u8]) -> String {

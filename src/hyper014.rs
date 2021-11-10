@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-//! Run Actix Web on AWS Lambda
 //!
+//! Run hyper based web framework on AWS Lambda
 //!
 use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
@@ -9,88 +9,65 @@ use lambda_runtime::{
     run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
     Handler as LambdaHandler,
 };
+use std::cell::RefCell;
+use std::convert::Infallible;
 use std::pin::Pin;
 
-/// Run Actix web application on AWS Lambda
+type HyperRequest = hyper::Request<hyper::Body>;
+type HyperResponse = hyper::Response<hyper::Body>;
+
+/// Run Warp application on AWS Lambda
 ///
 /// ```no_run
-/// use lambda_web::actix_web::{self, get, App, HttpServer, Responder};
-/// use lambda_web::{is_running_on_lambda, run_actix_on_lambda, LambdaError};
+/// use warp::{self, Filter};
+/// use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
 ///
-/// #[get("/")]
-/// async fn hello() -> impl Responder {
-///     format!("Hello")
-/// }
-///
-/// #[actix_web::main]
+/// #[tokio::main]
 /// async fn main() -> Result<(),LambdaError> {
-///     let factory = move || {
-///         App::new().service(hello)
-///     };
+///     // GET /hello/warp => 200 OK with body "Hello, warp!"
+///     let hello = warp::path!("hello" / String)
+///         .map(|name| format!("Hello, {}!", name));
+///
 ///     if is_running_on_lambda() {
 ///         // Run on AWS Lambda
-///         run_actix_on_lambda(factory).await?;
+///         run_warp_on_lambda(warp::service(hello)).await?;
 ///     } else {
 ///         // Run local server
-///         HttpServer::new(factory).bind("127.0.0.1:8080")?.run().await?;
+///         warp::serve(hello)
+///             .run(([127, 0, 0, 1], 8080))
+///             .await;
 ///     }
 ///     Ok(())
 /// }
 /// ```
 ///
-pub async fn run_actix_on_lambda<F, I, S, B>(factory: F) -> Result<(), LambdaError>
+pub async fn run_warp_on_lambda<S>(svc: S) -> Result<(), LambdaError>
 where
-    F: Fn() -> I + Send + Clone + 'static,
-    I: actix_service::IntoServiceFactory<S, actix_http::Request>,
-    S: actix_service::ServiceFactory<
-            actix_http::Request,
-            Config = actix_web::dev::AppConfig,
-            Response = actix_web::dev::ServiceResponse<B>,
-            Error = actix_web::Error,
-        > + 'static,
-    S::InitError: std::fmt::Debug,
-    B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Display,
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
+        + 'static,
 {
-    // Prepare actix_service::Service
-    let srv = factory().into_factory();
-    let new_svc = srv
-        .new_service(actix_web::dev::AppConfig::default())
-        .await
-        .unwrap();
-
-    lambda_runtime_run(ActixHandler(new_svc)).await?;
+    lambda_runtime_run(HyperHandler(RefCell::new(svc))).await?;
 
     Ok(())
 }
 
-/// Lambda_runtime handler for Actix Web
-struct ActixHandler<S, B>(S)
+/// Lambda_runtime handler for hyper
+struct HyperHandler<S>(RefCell<S>)
 where
-    S: actix_service::Service<
-            actix_http::Request,
-            Response = actix_web::dev::ServiceResponse<B>,
-            Error = actix_web::Error,
-        > + 'static,
-    B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Display;
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
+        + 'static;
 
-impl<S, B> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for ActixHandler<S, B>
+impl<S> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for HyperHandler<S>
 where
-    S: actix_service::Service<
-            actix_http::Request,
-            Response = actix_web::dev::ServiceResponse<B>,
-            Error = actix_web::Error,
-        > + 'static,
-    B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Display,
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
+        + 'static,
 {
-    type Error = B::Error;
+    type Error = LambdaError;
     type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
 
     /// Lambda handler function
-    /// Parse Lambda event as Actix-web request,
-    /// serialize Actix-web response to Lambda JSON response
+    /// Parse Lambda event as hyper request,
+    /// serialize hyper response to Lambda JSON response
     fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
         use serde_json::json;
 
@@ -100,10 +77,10 @@ where
         let multi_value = event.multi_value();
 
         // Parse request
-        let actix_request = actix_http::Request::try_from(event);
+        let hyper_request = HyperRequest::try_from(event);
 
-        // Call Actix service when request parsing succeeded
-        let svc_call = actix_request.map(|req| self.0.call(req));
+        // Call hyper service when request parsing succeeded
+        let svc_call = hyper_request.map(|req| self.0.borrow_mut().call(req));
 
         let fut = async move {
             match svc_call {
@@ -111,9 +88,9 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_actix_web(response, client_br, multi_value).await
+                        api_gateway_response_from_hyper(response, client_br, multi_value).await
                     } else {
-                        // Some Actix web error -> 500 Internal Server Error
+                        // Some hyper error -> 500 Internal Server Error
                         Ok(json!({
                             "isBase64Encoded": false,
                             "statusCode": 500u16,
@@ -137,70 +114,86 @@ where
     }
 }
 
-impl TryFrom<LambdaHttpEvent<'_>> for actix_http::Request {
+impl TryFrom<LambdaHttpEvent<'_>> for HyperRequest {
     type Error = LambdaError;
 
-    /// Actix-web Request from API Gateway event
+    /// hyper Request from API Gateway event
     fn try_from(event: LambdaHttpEvent) -> Result<Self, Self::Error> {
-        use actix_web::http::Method;
+        use hyper::header::{HeaderName, HeaderValue};
+        use hyper::Method;
+        use std::str::FromStr;
 
-        // Construct actix_web request
+        // URI
+        let uri = format!(
+            "https://{}{}",
+            event.hostname().unwrap_or("localhost"),
+            event.path_query()
+        );
+
+        // Method
         let method = Method::try_from(event.method())?;
-        let req = actix_web::test::TestRequest::with_uri(&event.path_query()).method(method);
 
-        // Source IP
-        let req = if let Some(source_ip) = event.source_ip() {
-            req.peer_addr(std::net::SocketAddr::from((source_ip, 0u16)))
-        } else {
-            req
-        };
+        // Construct hyper request
+        let mut reqbuilder = hyper::Request::builder().method(method).uri(&uri);
 
-        // Headers
-        let req = event
-            .headers()
-            .into_iter()
-            .fold(req, |req, (k, v)| req.insert_header((k, &v as &str)));
+        // headers
+        if let Some(headers_mut) = reqbuilder.headers_mut() {
+            for (k, v) in event.headers() {
+                if let (Ok(k), Ok(v)) = (
+                    HeaderName::from_str(k as &str),
+                    HeaderValue::from_str(&v as &str),
+                ) {
+                    headers_mut.insert(k, v);
+                }
+            }
+        }
 
         // Body
-        let req = req.set_payload(event.body()?);
+        let req = reqbuilder.body(hyper::Body::from(event.body()?))?;
 
-        Ok(req.to_request())
+        Ok(req)
     }
 }
 
-impl<B> crate::brotli::ResponseCompression for actix_web::dev::ServiceResponse<B> {
+impl crate::brotli::ResponseCompression for HyperResponse {
     /// Content-Encoding header value
     fn content_encoding<'a>(&'a self) -> Option<&'a str> {
         self.headers()
-            .get(actix_web::http::header::CONTENT_ENCODING)
+            .get(hyper::header::CONTENT_ENCODING)
             .and_then(|val| val.to_str().ok())
     }
 
     /// Content-Type header value
     fn content_type<'a>(&'a self) -> Option<&'a str> {
         self.headers()
-            .get(actix_web::http::header::CONTENT_TYPE)
+            .get(hyper::header::CONTENT_TYPE)
             .and_then(|val| val.to_str().ok())
     }
 }
 
-/// API Gateway response from Actix-web response
-async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
-    response: actix_web::dev::ServiceResponse<B>,
+/// API Gateway response from hyper response
+async fn api_gateway_response_from_hyper(
+    response: HyperResponse,
     client_support_br: bool,
     multi_value: bool,
-) -> Result<serde_json::Value, B::Error> {
+) -> Result<serde_json::Value, LambdaError> {
     use crate::brotli::ResponseCompression;
-    use actix_web::http::header::SET_COOKIE;
+    use hyper::header::SET_COOKIE;
     use serde_json::json;
 
+    // Check if response should be compressed
+    let compress = client_support_br && response.can_brotli_compress();
+
+    // Divide resonse into headers and body
+    let (parts, res_body) = response.into_parts();
+
     // HTTP status
-    let status_code = response.status().as_u16();
+    let status_code = parts.status.as_u16();
 
     // Convert header to JSON map
     let mut cookies = Vec::<String>::new();
     let mut headers = serde_json::Map::new();
-    for (k, v) in response.headers() {
+    for (k, v) in parts.headers.iter() {
         if let Ok(value_str) = v.to_str() {
             if multi_value {
                 // REST API format, returns multiValueHeaders
@@ -222,9 +215,8 @@ async fn api_gateway_response_from_actix_web<B: actix_web::body::MessageBody>(
         }
     }
 
-    // check if response should be compressed
-    let compress = client_support_br && response.can_brotli_compress();
-    let body_bytes = actix_web::body::to_bytes(response.into_body()).await?;
+    // Compress, base64 encode the response body
+    let body_bytes = hyper::body::to_bytes(res_body).await?;
     let body_base64 = if compress {
         if multi_value {
             headers.insert("content-encoding".to_string(), json!(["br"]));
@@ -259,10 +251,11 @@ mod tests {
     use super::*;
     use crate::{request::LambdaHttpEvent, test_consts::*};
 
-    // Request JSON to actix_http::Request
-    fn prepare_request(event_str: &str) -> actix_http::Request {
+    // Request JSON string to http::Request
+    fn prepare_request(event_str: &str) -> HyperRequest {
         let reqjson: LambdaHttpEvent = serde_json::from_str(event_str).unwrap();
-        actix_http::Request::try_from(reqjson).unwrap()
+        let req = HyperRequest::try_from(reqjson).unwrap();
+        req
     }
 
     #[test]
@@ -330,85 +323,70 @@ mod tests {
         assert_eq!(req.uri().query(), Some("key=%E6%97%A5%E6%9C%AC%E8%AA%9E"));
     }
 
-    #[test]
-    fn test_remote_ip_decode() {
-        use std::net::IpAddr;
-        use std::str::FromStr;
-
-        let req = prepare_request(API_GATEWAY_V2_GET_ROOT_ONEQUERY);
-        assert_eq!(
-            req.peer_addr().unwrap().ip(),
-            IpAddr::from_str("1.2.3.4").unwrap()
-        );
-        let req = prepare_request(API_GATEWAY_REST_GET_ROOT_ONEQUERY);
-        assert_eq!(
-            req.peer_addr().unwrap().ip(),
-            IpAddr::from_str("1.2.3.4").unwrap()
-        );
-
-        let req = prepare_request(API_GATEWAY_V2_GET_REMOTE_IPV6);
-        assert_eq!(
-            req.peer_addr().unwrap().ip(),
-            IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
-        );
-        let req = prepare_request(API_GATEWAY_REST_GET_REMOTE_IPV6);
-        assert_eq!(
-            req.peer_addr().unwrap().ip(),
-            IpAddr::from_str("2404:6800:400a:80c::2004").unwrap()
-        );
-    }
-
     #[tokio::test]
     async fn test_form_post() {
-        use actix_web::http::Method;
+        use hyper::body::to_bytes;
+        use hyper::Method;
 
         let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED);
         assert_eq!(req.method(), Method::POST);
+        assert_eq!(
+            to_bytes(req.into_body()).await.unwrap().as_ref(),
+            b"key1=value1&key2=value2&Ok=Ok"
+        );
         let req = prepare_request(API_GATEWAY_REST_POST_FORM_URLENCODED);
         assert_eq!(req.method(), Method::POST);
+        assert_eq!(
+            to_bytes(req.into_body()).await.unwrap().as_ref(),
+            b"key1=value1&key2=value2&Ok=Ok"
+        );
 
         // Base64 encoded
         let req = prepare_request(API_GATEWAY_V2_POST_FORM_URLENCODED_B64);
         assert_eq!(req.method(), Method::POST);
+        assert_eq!(
+            to_bytes(req.into_body()).await.unwrap().as_ref(),
+            b"key1=value1&key2=value2&Ok=Ok"
+        );
         let req = prepare_request(API_GATEWAY_REST_POST_FORM_URLENCODED_B64);
         assert_eq!(req.method(), Method::POST);
+        assert_eq!(
+            to_bytes(req.into_body()).await.unwrap().as_ref(),
+            b"key1=value1&key2=value2&Ok=Ok"
+        );
     }
 
     #[test]
     fn test_parse_header() {
         let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
-        assert_eq!(req.head().headers.get("x-forwarded-port").unwrap(), &"443");
-        assert_eq!(
-            req.head().headers.get("x-forwarded-proto").unwrap(),
-            &"https"
-        );
+        assert_eq!(req.headers().get("x-forwarded-port").unwrap(), &"443");
+        assert_eq!(req.headers().get("x-forwarded-proto").unwrap(), &"https");
         let req = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
-        assert_eq!(req.head().headers.get("x-forwarded-port").unwrap(), &"443");
-        assert_eq!(
-            req.head().headers.get("x-forwarded-proto").unwrap(),
-            &"https"
-        );
+        assert_eq!(req.headers().get("x-forwarded-port").unwrap(), &"443");
+        assert_eq!(req.headers().get("x-forwarded-proto").unwrap(), &"https");
     }
 
     #[test]
     fn test_parse_cookies() {
         let req = prepare_request(API_GATEWAY_V2_GET_ROOT_NOQUERY);
-        assert_eq!(req.head().headers.get("cookie"), None);
+        assert_eq!(req.headers().get("cookie"), None);
+        let req = prepare_request(API_GATEWAY_REST_GET_ROOT_NOQUERY);
+        assert_eq!(req.headers().get("cookie"), None);
 
         let req = prepare_request(API_GATEWAY_V2_GET_ONE_COOKIE);
-        assert_eq!(req.head().headers.get("cookie").unwrap(), &"cookie1=value1");
+        assert_eq!(req.headers().get("cookie").unwrap(), &"cookie1=value1");
         let req = prepare_request(API_GATEWAY_REST_GET_ONE_COOKIE);
-        assert_eq!(req.head().headers.get("cookie").unwrap(), &"cookie1=value1");
+        assert_eq!(req.headers().get("cookie").unwrap(), &"cookie1=value1");
 
         let req = prepare_request(API_GATEWAY_V2_GET_TWO_COOKIES);
-        assert!(
-            req.head().headers.get("cookie").unwrap() == &"cookie2=value2; cookie1=value1"
-                || req.head().headers.get("cookie").unwrap() == &"cookie1=value1; cookie2=value2"
+        assert_eq!(
+            req.headers().get("cookie").unwrap(),
+            &"cookie1=value1; cookie2=value2"
         );
         let req = prepare_request(API_GATEWAY_REST_GET_TWO_COOKIES);
-        assert!(
-            req.head().headers.get("cookie").unwrap() == &"cookie2=value2; cookie1=value1"
-                || req.head().headers.get("cookie").unwrap() == &"cookie1=value1; cookie2=value2"
+        assert_eq!(
+            req.headers().get("cookie").unwrap(),
+            &"cookie1=value1; cookie2=value2"
         );
     }
 }
