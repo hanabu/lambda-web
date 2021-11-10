@@ -28,7 +28,7 @@ impl LambdaHttpEvent<'_> {
         match self {
             Self::ApiGatewayHttpV2(event) => Some(&event.request_context.domain_name),
             Self::ApiGatewayRestOrAlb(event) => {
-                if let Some(context) = &event.request_context {
+                if let RestOrAlbRequestContext::Rest(context) = &event.request_context {
                     Some(&context.domain_name)
                 } else if let Some(host_headers) = event.multi_value_headers.get("host") {
                     host_headers.first().map(|h| h as &str)
@@ -54,7 +54,7 @@ impl LambdaHttpEvent<'_> {
                 }
             }
             Self::ApiGatewayRestOrAlb(event) => {
-                let path = if let Some(context) = &event.request_context {
+                let path = if let RestOrAlbRequestContext::Rest(context) = &event.request_context {
                     // API Gateway REST, request_contest.path contains stage prefix
                     &context.path
                 } else {
@@ -224,7 +224,7 @@ impl LambdaHttpEvent<'_> {
                 IpAddr::from_str(&event.request_context.http.source_ip).ok()
             }
             Self::ApiGatewayRestOrAlb(event) => {
-                if let Some(context) = &event.request_context {
+                if let RestOrAlbRequestContext::Rest(context) = &event.request_context {
                     IpAddr::from_str(&context.identity.source_ip).ok()
                 } else {
                     None
@@ -322,11 +322,18 @@ pub(crate) struct ApiGatewayRestEvent<'a> {
     #[serde(default)]
     multi_value_query_string_parameters: Option<HashMap<String, Vec<String>>>,
     // request_context = None when called from ALB
-    request_context: Option<ApiGatewayRestRequestContext>,
+    request_context: RestOrAlbRequestContext,
     // headers: HashMap<String, String>,
     // path_parameters: HashMap<String, String>,
     // query_string_parameters: HashMap<String, String>,
     // stage_variables: HashMap<String, String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+enum RestOrAlbRequestContext {
+    Rest(ApiGatewayRestRequestContext),
+    Alb(AlbRequestContext),
 }
 
 /// API Gateway REST API request context
@@ -358,6 +365,11 @@ struct ApiGatewayRestIdentity {
     access_key: Option<String>,
     source_ip: String,
 }
+
+/// ALB Request context
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct AlbRequestContext {}
 
 // raw_path in API Gateway HTTP API V2 payload is percent decoded.
 // Path containing space or UTF-8 char is
