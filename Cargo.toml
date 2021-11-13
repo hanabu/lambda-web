@@ -1,13 +1,13 @@
 [package]
 name = "lambda-web"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Hanabusa Masahiro"]
 description = "Run Rust web frameworks on AWS Lambda"
 edition = "2018"
 readme = "README.md"
 repository = "https://github.com/hanabu/lambda-web"
 license = "MIT"
-keywords = ["lambda", "actix-web", "rocket", "warp"]
+keywords = ["lambda", "actix-web", "axum", "rocket", "warp"]
 categories = ["web-programming::http-server"]
 exclude = ["/docker/"]
 
@@ -37,15 +37,22 @@ actix-web = { version = "4.0.0-beta.10", default-features = false, features = ["
 actix-http = { version = "3.0.0-beta.11", default-features = false, optional = true }
 actix-service = { version = "2", optional = true }
 rocket = { version = "0.5.0-rc.1", default-features = false, optional = true }
-warp = { version = "0.3.1", default-features = false, optional = true }
+warp = { version = "0.3.2", default-features = false, optional = true }
 brotli = { version = "3", features = ["std"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
+axum = { version = "0.3.2", default-features = false }
+warp = { version = "0.3.2", default-features = false }
+tower = "0.4"
 
 [[example]]
 name = "actix"
 required-features = ["actix4"]
+
+[[example]]
+name = "axum"
+required-features = ["hyper"]
 
 [[example]]
 name = "rocket"
@@ -53,4 +60,10 @@ required-features = ["rocket05"]
 
 [[example]]
 name = "warp"
-required-features = ["warp03"]
+required-features = ["hyper"]
+
+[profile.release]
+# Size optimization
+opt-level = "s"
+lto = "fat"
+codegen-units = 1

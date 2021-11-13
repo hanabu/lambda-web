@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 : Unreleased
+
+- Support [axum](target/release/examples/axum) web framework
+
 ## 0.1.7 : 2021-11-10
 
 - Support API gateway REST API

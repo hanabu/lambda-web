@@ -1,5 +1,5 @@
-use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
-use warp::{self, Filter};
+use lambda_web::{is_running_on_lambda, run_hyper_on_lambda, LambdaError};
+use warp::Filter;
 
 #[tokio::main]
 async fn main() -> Result<(), LambdaError> {
@@ -8,7 +8,7 @@ async fn main() -> Result<(), LambdaError> {
 
     if is_running_on_lambda() {
         // Run on AWS Lambda
-        run_warp_on_lambda(warp::service(hello)).await?;
+        run_hyper_on_lambda(warp::service(hello)).await?;
     } else {
         // Run local server
         warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
