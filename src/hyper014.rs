@@ -14,7 +14,7 @@ use std::convert::Infallible;
 use std::pin::Pin;
 
 type HyperRequest = hyper::Request<hyper::Body>;
-type HyperResponse = hyper::Response<hyper::Body>;
+type HyperResponse<B> = hyper::Response<B>;
 
 /// Run Warp application on AWS Lambda
 ///
@@ -33,34 +33,105 @@ type HyperResponse = hyper::Response<hyper::Body>;
 ///         run_warp_on_lambda(warp::service(hello)).await?;
 ///     } else {
 ///         // Run local server
-///         warp::serve(hello)
-///             .run(([127, 0, 0, 1], 8080))
-///             .await;
+///         warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
 ///     }
 ///     Ok(())
 /// }
 /// ```
 ///
+#[cfg(feature = "warp03")]
+#[inline]
 pub async fn run_warp_on_lambda<S>(svc: S) -> Result<(), LambdaError>
 where
-    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
+    S: hyper::service::Service<
+            HyperRequest,
+            Response = HyperResponse<hyper::Body>,
+            Error = Infallible,
+        > + 'static,
+{
+    run_hyper_on_lambda(svc).await
+}
+
+/// Run hyper based web framework on AWS Lambda
+///
+/// axum 0.3 example:
+///
+/// ```no_run
+/// use axum::{routing::get, Router};
+/// use lambda_web::{is_running_on_lambda, run_hyper_on_lambda, LambdaError};
+/// use std::net::SocketAddr;
+///
+/// // basic handler that responds with a static string
+/// async fn root() -> &'static str {
+///     "Hello, World!"
+/// }
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), LambdaError> {
+///     // build our application with a route
+///     let app = Router::new()
+///         // `GET /` goes to `root`
+///         .route("/", get(root));
+///
+///     if is_running_on_lambda() {
+///         // Run app on AWS Lambda
+///         run_hyper_on_lambda(app).await?;
+///     } else {
+///         // Run app on local server
+///         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+///         axum::Server::bind(&addr).serve(app.into_make_service()).await?;
+///     }
+///     Ok(())
+/// }
+/// ```
+///
+/// warp 0.3 example:
+///
+/// ```no_run
+/// use warp::Filter;
+/// use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(),LambdaError> {
+///     // GET /hello/warp => 200 OK with body "Hello, warp!"
+///     let hello = warp::path!("hello" / String)
+///         .map(|name| format!("Hello, {}!", name));
+///
+///     if is_running_on_lambda() {
+///         // Run app on AWS Lambda
+///         run_warp_on_lambda(warp::service(hello)).await?;
+///     } else {
+///         // Run app on local server
+///         warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
+///     }
+///     Ok(())
+/// }
+/// ```
+pub async fn run_hyper_on_lambda<S, B>(svc: S) -> Result<(), LambdaError>
+where
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
         + 'static,
+    B: hyper::body::HttpBody,
+    <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
 {
     lambda_runtime_run(HyperHandler(RefCell::new(svc))).await?;
-
     Ok(())
 }
 
 /// Lambda_runtime handler for hyper
-struct HyperHandler<S>(RefCell<S>)
+struct HyperHandler<S, B>(RefCell<S>)
 where
-    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
-        + 'static;
-
-impl<S> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for HyperHandler<S>
-where
-    S: hyper::service::Service<HyperRequest, Response = HyperResponse, Error = Infallible>
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
         + 'static,
+    B: hyper::body::HttpBody,
+    <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static;
+
+impl<S, B> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for HyperHandler<S, B>
+where
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
+        + 'static,
+    B: hyper::body::HttpBody,
+    <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Error = LambdaError;
     type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
@@ -155,7 +226,7 @@ impl TryFrom<LambdaHttpEvent<'_>> for HyperRequest {
     }
 }
 
-impl crate::brotli::ResponseCompression for HyperResponse {
+impl<B> crate::brotli::ResponseCompression for HyperResponse<B> {
     /// Content-Encoding header value
     fn content_encoding<'a>(&'a self) -> Option<&'a str> {
         self.headers()
@@ -172,11 +243,15 @@ impl crate::brotli::ResponseCompression for HyperResponse {
 }
 
 /// API Gateway response from hyper response
-async fn api_gateway_response_from_hyper(
-    response: HyperResponse,
+async fn api_gateway_response_from_hyper<B>(
+    response: HyperResponse<B>,
     client_support_br: bool,
     multi_value: bool,
-) -> Result<serde_json::Value, LambdaError> {
+) -> Result<serde_json::Value, LambdaError>
+where
+    B: hyper::body::HttpBody,
+    <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
+{
     use crate::brotli::ResponseCompression;
     use hyper::header::SET_COOKIE;
     use serde_json::json;

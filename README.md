@@ -11,6 +11,7 @@ Currently, it supports Actix web, Rocket, Warp.
 ### Supported web frameworks
 
 - [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.10) 4.0.0-beta.10
+- [axum](https://crates.io/crates/axum) 0.3.0
 - [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
 - [Warp](https://crates.io/crates/warp) 0.3.1
 
@@ -36,7 +37,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.7", features=["actix4"] }
+lambda-web = { version = "0.1.8", features=["actix4"] }
 ```
 
 main.rs
@@ -70,6 +71,50 @@ async fn main() -> Result<(),LambdaError> {
 }
 ```
 
+### axum
+
+Cargo.toml
+
+```toml
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+
+[dependencies]
+lambda-web = { version = "0.1.8", features=["hyper"] }
+axum = "0.3"
+tokio = { version = "1" }
+```
+
+main.rs
+
+```rust
+use axum::{routing::get, Router};
+use lambda_web::{is_running_on_lambda, run_hyper_on_lambda, LambdaError};
+use std::net::SocketAddr;
+
+// basic handler that responds with a static string
+async fn root() -> &'static str {
+    "Hello, World!"
+}
+
+#[tokio::main]
+async fn main() -> Result<(), LambdaError> {
+    // build our application with a route
+    let app = Router::new().route("/", get(root));
+
+    if is_running_on_lambda() {
+        // Run app on AWS Lambda
+        run_hyper_on_lambda(app).await?;
+    } else {
+        // Run app on local server
+        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+        axum::Server::bind(&addr).serve(app.into_make_service()).await?;
+    }
+    Ok(())
+}
+```
+
 ### Rocket
 
 Cargo.toml
@@ -80,7 +125,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.7", features=["rocket05"] }
+lambda-web = { version = "0.1.8", features=["rocket05"] }
 rocket = "0.5.0-rc.1"
 ```
 
@@ -119,7 +164,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.7", features=["warp03"] }
+lambda-web = { version = "0.1.8", features=["hyper"] }
 warp = "0.3"
 tokio = { version = "1" }
 ```
@@ -127,7 +172,7 @@ tokio = { version = "1" }
 main.rs
 
 ```rust
-use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
+use lambda_web::{is_running_on_lambda, run_hyper_on_lambda, LambdaError};
 use warp::Filter;
 
 #[tokio::main]
@@ -137,7 +182,7 @@ async fn main() -> Result<(), LambdaError> {
 
     if is_running_on_lambda() {
         // Run on AWS Lambda
-        run_warp_on_lambda(warp::service(hello)).await?;
+        run_hyper_on_lambda(warp::service(hello)).await?;
     } else {
         // Run local server
         warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
