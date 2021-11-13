@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.8 : Unreleased
+## 0.1.8 : 2021-11-13
 
 - Support [axum](target/release/examples/axum) web framework
 
