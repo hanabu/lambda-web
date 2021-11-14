@@ -1,0 +1,70 @@
+version: 0.2
+
+env:
+  variables:
+     PATH: "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/codebuild/user/bin"
+     # key: "value"
+  #parameter-store:
+     # key: "value"
+     # key: "value"
+  #secrets-manager:
+     # key: secret-id:json-key:version-stage:version-id
+     # key: secret-id:json-key:version-stage:version-id
+  #exported-variables:
+     # - variable
+     # - variable
+  #git-credential-helper: yes
+#batch:
+  #fast-fail: true
+  #build-list:
+  #build-matrix:
+  #build-graph:
+phases:
+  install:
+    commands:
+      # Install rust toolchanin
+      - curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+  pre_build:
+    commands:
+      # Uncomment if you require custom build setting 
+      #- mkdir -p .cargo
+      #- |
+      #  cat > .cargo/config.toml <<EOF
+      #  [profile.release]
+      #  codegen-units = 1
+      #  opt-level = "s"
+      #  lto = "fat"
+      #  EOF
+  build:
+    commands:
+      # check compiler
+      - rustc -V
+      # build axum example
+      - cargo build --release --features=hyper --example axum
+      # binary name must be "bootstrap" for Lambda custom runtime
+      - mv target/release/examples/axum bootstrap
+      # strip & check size, dependencies
+      - strip --strip-all bootstrap
+      - size bootstrap
+      - ldd bootstrap
+  #post_build:
+    #commands:
+      # - command
+#reports:
+  #report-name-or-arn:
+    #files:
+      # - location
+      # - location
+    #base-directory: location
+    #discard-paths: yes
+    #file-format: JunitXml | CucumberJson
+artifacts:
+  files:
+    - bootstrap
+    # - add other resources such as CSS, Javascript assets, etc.
+  #discard-paths: yes
+  #name: $(date +%Y-%m-%d)
+  #base-directory: location
+#cache:
+  #paths:
+    # - paths
