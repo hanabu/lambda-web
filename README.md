@@ -193,44 +193,11 @@ async fn main() -> Result<(), LambdaError> {
 
 ## Create deploy ZIP file
 
-Currentry (Jun 2021), we have two options to run Rust on AWS Lambda: [Amazon Linux 2 custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) or Docker container image.
+As of writing (Nov, 2021), we have two options to run Rust on AWS Lambda: [Amazon Linux 2 custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) or Docker container image.
 
-I recommend Amazon Linux 2 custom runtime deploy because it's faster cold start time than container image.
+I recommend ZIP deploy to Amazon Linux 2 custom runtime (`provided.al2`) because it's faster cold start time than container image.
 
-To build Amazon Linux 2 compatible binary, it's better to build inside container. First, build Amazon Linux 2 container with Rust toolchain. This repository contains [sample Dockerfile](https://github.com/hanabu/lambda-web/blob/main/docker/Dockerfile) .
-
-```console
-$ git clone https://github.com/hanabu/lambda-web
-...
-$ docker build -t lambda_builder lambda-web/docker
-...
-
-or
-$ buildah bud -t lambda_builder lambda-web/docker
-...
-```
-
-Once you get lambda\_builder image, then build your code with Amazon Linux.
-
-```console
-$ cd your_app_crate_dir
-$ docker run -it --rm -v ~/.cargo/registry:/root/.cargo/registry:z -v .:/build:z lambda_builder
-...
-
-or
-$ podman run -it --rm -v ~/.cargo/registry:/root/.cargo/registry:z -v .:/build:z lambda_builder
-...
-```
-
-Then, you get deploy ZIP package in your\_app\_crate\_dir/target\_lambda/deploy.zip .
-
-Make sure, your Cargo.toml has `bootstrap` binary name.
-
-```toml
-[[bin]]
-name = "bootstrap"
-path = "src/main.rs"
-```
+To build Amazon Linux 2 compatible binary, see [Deploy.md](./Deploy.md) for more details.
 
 ## Setup AWS Lambda & API gateway
 
