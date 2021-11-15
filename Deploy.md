@@ -4,7 +4,7 @@
 
 - I reccomend ZIP deploy to `provided.al2` than container deploy, because of faster cold start time.
 - To avoid shared library version mismatch, run `cargo build` on Amazon Linux 2 environment.
-- Using CodeBuild may be the simplest way. You can also build [Arm64 binary](https://aws.amazon.com/blogs/news/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/) if you prefer it.
+- Using CodeBuild may be the simplest way. You can also build Arm64 binary if you prefer it.
 - This repository contains [sample buildspec.yml](./buildspec.yml) for this purpose.
 
 ## Deploy Rust binary to AWS Lambda
@@ -80,7 +80,7 @@ Third, create new CodeBuild project.
   - Select `Managed Image`
   - Operating system - `Amazon Linux 2`
   - Runtime - `Standard`
-  - Image - `aws/codebuild/amazonlinux2-aarch64-standard:2.0` or `aws/codebuild/amazonlinux2-x86_64-standard:3.0` (as of writing; Newer image will be come)
+  - Image - `aws/codebuild/amazonlinux2-aarch64-standard:2.0` or `aws/codebuild/amazonlinux2-x86_64-standard:3.0` (as of writing; Newer image will come)
   - Environment type - `Linux`
   - Privileged - `disable`
   - Service role - If you unsure, select `New service role` and name it. If you use existing role, the role needs S3:PutObject permision to the bucket mentioned above.
@@ -144,3 +144,18 @@ $ docker run -it --rm \
 $ ls
 Cargo.lock  Cargo.toml  bootstrap  deploy.zip  src  target_al2
 ```
+
+## Arm64 build
+
+[AWS released Graviton2 processor (Arm64) for Lambda](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/)
+ on Sep, 2021.
+Graviton2 Lambda function is cost effective option, you may interested in it.
+
+If you use CodeBuild, all pieces for Arm64 support are available!
+
+- CodeBuild already [supports Graviton2](https://aws.amazon.com/about-aws/whats-new/2021/02/aws-codebuild-supports-arm-based-workloads-using-aws-graviton2/)
+- Rust compiler supports [aarch64-unknown-linux-gnu as tier 1](https://doc.rust-lang.org/rustc/platform-support.html#tier-1-with-host-tools)
+- Lambda function [powered by Graviton2 prcessor](https://aws.amazon.com/about-aws/whats-new/2021/09/better-price-performance-aws-lambda-functions-aws-graviton2-processor/)
+
+You only switch CodeBuild image as
+`aws/codebuild/amazonlinux2-aarch64-standard` and Lambda function architecture as `arm64`.
