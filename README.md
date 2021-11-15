@@ -1,7 +1,7 @@
 # lambda-web
 
 Run Rust web server frameworks on AWS Lambda.
-Currently, it supports Actix web, Rocket, Warp.
+Currently, it supports Actix web, axum, Rocket, warp.
 
 [![crates.io](https://img.shields.io/crates/v/lambda-web?label=latest)](https://crates.io/crates/lambda-web)
 [![API docs](https://docs.rs/lambda-web/badge.svg)](https://docs.rs/lambda-web)
@@ -11,9 +11,9 @@ Currently, it supports Actix web, Rocket, Warp.
 ### Supported web frameworks
 
 - [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.10) 4.0.0-beta.10
-- [axum](https://crates.io/crates/axum) 0.3.0
+- [axum](https://crates.io/crates/axum) 0.3
 - [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
-- [Warp](https://crates.io/crates/warp) 0.3.1
+- [warp](https://crates.io/crates/warp) 0.3
 
 ### Supported AWS infrastructure
 
@@ -154,7 +154,7 @@ async fn main() -> Result<(), LambdaError> {
 }
 ```
 
-### Warp
+### warp
 
 Cargo.toml
 
