@@ -239,6 +239,7 @@ impl LambdaHttpEvent<'_> {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ApiGatewayHttpV2Event<'a> {
+    #[allow(dead_code)]
     version: String,
     raw_path: String,
     raw_query_string: String,
@@ -362,6 +363,7 @@ struct ApiGatewayRestRequestContext {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ApiGatewayRestIdentity {
+    #[allow(dead_code)]
     access_key: Option<String>,
     source_ip: String,
 }
