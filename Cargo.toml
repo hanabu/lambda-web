@@ -1,6 +1,6 @@
 [package]
 name = "lambda-web"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Hanabusa Masahiro"]
 description = "Run Rust web frameworks on AWS Lambda"
 edition = "2018"

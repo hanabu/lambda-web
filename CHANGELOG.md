@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9 : 2022-02-28
+
+- Actix-Web 4.0.0
+
 ## 0.1.8 : 2021-11-13
 
 - Support [axum](target/release/examples/axum) web framework
