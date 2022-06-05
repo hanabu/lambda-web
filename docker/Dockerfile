@@ -1,6 +1,6 @@
 #!/usr/bin/env buildah bud --layers=true -t lambda_builder
 
-FROM amazonlinux:2
+FROM public.ecr.aws/amazonlinux/amazonlinux:2
 
 # Setup build environment
 RUN mkdir -p /build/src && \
