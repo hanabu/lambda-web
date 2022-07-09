@@ -10,15 +10,16 @@ Currently, it supports Actix web, axum, Rocket, warp.
 
 ### Supported web frameworks
 
-- [Actix Web](https://crates.io/crates/actix-web/4.0.0-beta.10) 4.0.0-beta.10
-- [axum](https://crates.io/crates/axum) 0.3
-- [Rocket](https://crates.io/crates/rocket/0.5.0-rc.1) 0.5.0-rc.1
+- [Actix Web](https://crates.io/crates/actix-web) 4.0
+- [axum](https://crates.io/crates/axum) 0.5
+- [Rocket](https://crates.io/crates/rocket/0.5.0-rc.2) 0.5.0-rc.2
 - [warp](https://crates.io/crates/warp) 0.3
 
 ### Supported AWS infrastructure
 
 - [API Gateway HTTP API](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api.html) with [payload format version 2.0](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html#2.0)
 - [API Gateway REST API](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-rest-api.html)
+- [Lambda function URLs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html)
 
 ### Not supported
 
@@ -37,7 +38,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.8", features=["actix4"] }
+lambda-web = { version = "0.2.0", features=["actix4"] }
 ```
 
 main.rs
@@ -63,7 +64,7 @@ async fn main() -> Result<(),LambdaError> {
     } else {
         // Local server
         HttpServer::new(factory)
-            .bind("127.0.0.1:8080")?
+            .bind("127.0.0.2.0080")?
             .run()
             .await?;
     }
@@ -81,8 +82,8 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.8", features=["hyper"] }
-axum = "0.3"
+lambda-web = { version = "0.2.0", features=["hyper"] }
+axum = "0.5"
 tokio = { version = "1" }
 ```
 
@@ -125,8 +126,8 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.8", features=["rocket05"] }
-rocket = "0.5.0-rc.1"
+lambda-web = { version = "0.2.0", features=["rocket05"] }
+rocket = "0.5.0-rc.2"
 ```
 
 main.rs
@@ -148,7 +149,7 @@ async fn main() -> Result<(), LambdaError> {
         launch_rocket_on_lambda(rocket).await?;
     } else {
         // Launch local server
-        rocket.launch().await?;
+        let _ = rocket.launch().await?;
     }
     Ok(())
 }
@@ -164,7 +165,7 @@ name = "bootstrap"
 path = "src/main.rs"
 
 [dependencies]
-lambda-web = { version = "0.1.8", features=["hyper"] }
+lambda-web = { version = "0.2.0", features=["hyper"] }
 warp = "0.3"
 tokio = { version = "1" }
 ```
@@ -198,6 +199,15 @@ As of writing (Nov, 2021), we have two options to run Rust on AWS Lambda: [Amazo
 I recommend ZIP deploy to Amazon Linux 2 custom runtime (`provided.al2`) because it's faster cold start time than container image.
 
 To build Amazon Linux 2 compatible binary, see [Deploy.md](./Deploy.md) for more details.
+
+## Setup AWS Lambda & function URLs
+
+- Create lambda function with `provided.al2` custom runtime. Choose "Provide your own bootstrap on Amazon Linux 2" .
+- Upload ZIP file described above.
+- IAM role, memory settings, etc. are as your demands. \
+  As sample code above consumes only 30MB of memory, many simple Rust app can fit in 128MB setting.
+- Create function URL, then you can call your Lambda function with `https://<url-id>.lambda-url.<region>.on.aws`
+- You can use CloudFront for custom domain.
 
 ## Setup AWS Lambda & API gateway
 
