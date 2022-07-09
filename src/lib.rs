@@ -28,11 +28,6 @@ pub use rocket05::launch_rocket_on_lambda;
 mod hyper014;
 #[cfg(feature = "hyper")]
 pub use hyper014::run_hyper_on_lambda;
-#[cfg(feature = "warp03")]
-#[deprecated(since = "0.1.8", note = "Use run_hyper_on_lambda()")]
-pub use hyper014::run_warp_on_lambda;
-#[cfg(feature = "warp03")]
-pub use warp;
 
 /// Returns true if it is running on AWS Lambda
 pub fn is_running_on_lambda() -> bool {
