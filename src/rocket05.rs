@@ -6,10 +6,7 @@
 use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
 use core::future::Future;
-use lambda_runtime::{
-    run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
-    Handler as LambdaHandler,
-};
+use lambda_runtime::{Error as LambdaError, LambdaEvent, Service as LambdaService};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -41,7 +38,7 @@ use std::sync::Arc;
 pub async fn launch_rocket_on_lambda<P: rocket::Phase>(
     r: rocket::Rocket<P>,
 ) -> Result<(), LambdaError> {
-    lambda_runtime_run(RocketHandler(Arc::new(
+    lambda_runtime::run(RocketHandler(Arc::new(
         rocket::local::asynchronous::Client::untracked(r).await?,
     )))
     .await?;
@@ -52,15 +49,27 @@ pub async fn launch_rocket_on_lambda<P: rocket::Phase>(
 /// Lambda_runtime handler for Rocket
 struct RocketHandler(Arc<rocket::local::asynchronous::Client>);
 
-impl LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for RocketHandler {
+impl LambdaService<LambdaEvent<LambdaHttpEvent<'_>>> for RocketHandler {
+    type Response = serde_json::Value;
     type Error = rocket::Error;
-    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>> + Send>>;
+
+    /// Always ready in case of Rocket local client
+    fn poll_ready(
+        &mut self,
+        _cx: &mut core::task::Context<'_>,
+    ) -> core::task::Poll<Result<(), Self::Error>> {
+        core::task::Poll::Ready(Ok(()))
+    }
 
     /// Lambda handler function
     /// Parse Lambda event as Rocket LocalRequest,
     /// serialize Rocket LocalResponse to Lambda JSON response
-    fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
+    fn call(&mut self, req: LambdaEvent<LambdaHttpEvent<'_>>) -> Self::Future {
         use serde_json::json;
+
+        let event = req.payload;
+        let _context = req.context;
 
         // check if web client supports content-encoding: br
         let client_br = event.client_supports_brotli();

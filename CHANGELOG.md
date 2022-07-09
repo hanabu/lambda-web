@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 : Not yet released
+
+- Update lambda_runtime 0.5.1
+- Remove "warp03" feature flag. Use "hyper" instead of it.
+
 ## 0.1.9 : 2022-02-28
 
 - Actix-Web 4.0.0

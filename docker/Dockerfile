@@ -1,4 +1,4 @@
-#!/usr/bin/env buildah bud --layers=true -t lambda_builder
+#!/usr/bin/env buildah bud -t lambda_builder
 
 FROM public.ecr.aws/amazonlinux/amazonlinux:2
 
@@ -6,7 +6,7 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2
 RUN mkdir -p /build/src && \
     yum update -y && \
 # Add required packages
-    yum install -y awscli gcc openssl-devel tree zip && \
+    yum install -y awscli gcc openssl-devel sqlite-devel tree zip && \
 # Install rust with rustup
     curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 

@@ -5,52 +5,12 @@
 use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
 use core::future::Future;
-use lambda_runtime::{
-    run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
-    Handler as LambdaHandler,
-};
-use std::cell::RefCell;
+use lambda_runtime::{Error as LambdaError, LambdaEvent, Service as LambdaService};
 use std::convert::Infallible;
 use std::pin::Pin;
 
 type HyperRequest = hyper::Request<hyper::Body>;
 type HyperResponse<B> = hyper::Response<B>;
-
-/// Run Warp application on AWS Lambda
-///
-/// ```no_run
-/// use warp::{self, Filter};
-/// use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(),LambdaError> {
-///     // GET /hello/warp => 200 OK with body "Hello, warp!"
-///     let hello = warp::path!("hello" / String)
-///         .map(|name| format!("Hello, {}!", name));
-///
-///     if is_running_on_lambda() {
-///         // Run on AWS Lambda
-///         run_warp_on_lambda(warp::service(hello)).await?;
-///     } else {
-///         // Run local server
-///         warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
-///     }
-///     Ok(())
-/// }
-/// ```
-///
-#[cfg(feature = "warp03")]
-#[inline]
-pub async fn run_warp_on_lambda<S>(svc: S) -> Result<(), LambdaError>
-where
-    S: hyper::service::Service<
-            HyperRequest,
-            Response = HyperResponse<hyper::Body>,
-            Error = Infallible,
-        > + 'static,
-{
-    run_hyper_on_lambda(svc).await
-}
 
 /// Run hyper based web framework on AWS Lambda
 ///
@@ -89,7 +49,7 @@ where
 ///
 /// ```no_run
 /// use warp::Filter;
-/// use lambda_web::{is_running_on_lambda, run_warp_on_lambda, LambdaError};
+/// use lambda_web::{is_running_on_lambda, run_hyper_on_lambda, LambdaError};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(),LambdaError> {
@@ -99,7 +59,7 @@ where
 ///
 ///     if is_running_on_lambda() {
 ///         // Run app on AWS Lambda
-///         run_warp_on_lambda(warp::service(hello)).await?;
+///         run_hyper_on_lambda(warp::service(hello)).await?;
 ///     } else {
 ///         // Run app on local server
 ///         warp::serve(hello).run(([127, 0, 0, 1], 8080)).await;
@@ -114,33 +74,45 @@ where
     B: hyper::body::HttpBody,
     <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
 {
-    lambda_runtime_run(HyperHandler(RefCell::new(svc))).await?;
+    lambda_runtime::run(HyperHandler(svc)).await?;
     Ok(())
 }
 
 /// Lambda_runtime handler for hyper
-struct HyperHandler<S, B>(RefCell<S>)
+struct HyperHandler<S, B>(S)
 where
     S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
         + 'static,
     B: hyper::body::HttpBody,
     <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static;
 
-impl<S, B> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for HyperHandler<S, B>
+impl<S, B> LambdaService<LambdaEvent<LambdaHttpEvent<'_>>> for HyperHandler<S, B>
 where
     S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
         + 'static,
     B: hyper::body::HttpBody,
     <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Error = LambdaError;
-    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
+    type Response = serde_json::Value;
+    type Error = Infallible;
+    type Future = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
+
+    /// Returns Poll::Ready when servie can process more requrests.
+    fn poll_ready(
+        &mut self,
+        cx: &mut core::task::Context<'_>,
+    ) -> core::task::Poll<Result<(), Self::Error>> {
+        self.0.poll_ready(cx)
+    }
 
     /// Lambda handler function
     /// Parse Lambda event as hyper request,
     /// serialize hyper response to Lambda JSON response
-    fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
+    fn call(&mut self, req: LambdaEvent<LambdaHttpEvent<'_>>) -> Self::Future {
         use serde_json::json;
+
+        let event = req.payload;
+        let _context = req.context;
 
         // check if web client supports content-encoding: br
         let client_br = event.client_supports_brotli();
@@ -151,7 +123,7 @@ where
         let hyper_request = HyperRequest::try_from(event);
 
         // Call hyper service when request parsing succeeded
-        let svc_call = hyper_request.map(|req| self.0.borrow_mut().call(req));
+        let svc_call = hyper_request.map(|req| self.0.call(req));
 
         let fut = async move {
             match svc_call {
@@ -159,7 +131,16 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_hyper(response, client_br, multi_value).await
+                        api_gateway_response_from_hyper(response, client_br, multi_value)
+                            .await
+                            .or_else(|_err| {
+                                Ok(json!({
+                                    "isBase64Encoded": false,
+                                    "statusCode": 500u16,
+                                    "headers": { "content-type": "text/plain"},
+                                    "body": "Internal Server Error"
+                                }))
+                            })
                     } else {
                         // Some hyper error -> 500 Internal Server Error
                         Ok(json!({

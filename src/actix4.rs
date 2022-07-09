@@ -5,10 +5,7 @@
 use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
 use core::future::Future;
-use lambda_runtime::{
-    run as lambda_runtime_run, Context as LambdaContext, Error as LambdaError,
-    Handler as LambdaHandler,
-};
+use lambda_runtime::{Error as LambdaError, LambdaEvent, Service as LambdaService};
 use std::pin::Pin;
 
 /// Run Actix web application on AWS Lambda
@@ -51,6 +48,7 @@ where
     S::InitError: std::fmt::Debug,
     B: actix_web::body::MessageBody,
     B::Error: std::fmt::Display,
+    <B as actix_web::body::MessageBody>::Error: std::fmt::Debug,
 {
     // Prepare actix_service::Service
     let srv = factory().into_factory();
@@ -59,7 +57,7 @@ where
         .await
         .unwrap();
 
-    lambda_runtime_run(ActixHandler(new_svc)).await?;
+    lambda_runtime::run(ActixHandler(new_svc)).await?;
 
     Ok(())
 }
@@ -73,9 +71,10 @@ where
             Error = actix_web::Error,
         > + 'static,
     B: actix_web::body::MessageBody,
-    B::Error: std::fmt::Display;
+    B::Error: std::fmt::Display,
+    <B as actix_web::body::MessageBody>::Error: std::fmt::Debug;
 
-impl<S, B> LambdaHandler<LambdaHttpEvent<'_>, serde_json::Value> for ActixHandler<S, B>
+impl<S, B> LambdaService<LambdaEvent<LambdaHttpEvent<'_>>> for ActixHandler<S, B>
 where
     S: actix_service::Service<
             actix_http::Request,
@@ -84,15 +83,28 @@ where
         > + 'static,
     B: actix_web::body::MessageBody,
     B::Error: std::fmt::Display,
+    <B as actix_web::body::MessageBody>::Error: std::fmt::Debug,
 {
-    type Error = B::Error;
-    type Fut = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
+    type Response = serde_json::Value;
+    type Error = actix_web::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
+
+    /// Returns Poll::Ready when servie can process more requrests.
+    fn poll_ready(
+        &mut self,
+        cx: &mut core::task::Context<'_>,
+    ) -> core::task::Poll<Result<(), Self::Error>> {
+        self.0.poll_ready(cx)
+    }
 
     /// Lambda handler function
     /// Parse Lambda event as Actix-web request,
     /// serialize Actix-web response to Lambda JSON response
-    fn call(&self, event: LambdaHttpEvent, _context: LambdaContext) -> Self::Fut {
+    fn call(&mut self, req: LambdaEvent<LambdaHttpEvent<'_>>) -> Self::Future {
         use serde_json::json;
+
+        let event = req.payload;
+        let _context = req.context;
 
         // check if web client supports content-encoding: br
         let client_br = event.client_supports_brotli();
@@ -111,7 +123,16 @@ where
                     // Request parsing succeeded
                     if let Ok(response) = svc_fut.await {
                         // Returns as API Gateway response
-                        api_gateway_response_from_actix_web(response, client_br, multi_value).await
+                        api_gateway_response_from_actix_web(response, client_br, multi_value)
+                            .await
+                            .or_else(|_err| {
+                                Ok(json!({
+                                    "isBase64Encoded": false,
+                                    "statusCode": 500u16,
+                                    "headers": { "content-type": "text/plain"},
+                                    "body": "Internal Server Error"
+                                }))
+                            })
                     } else {
                         // Some Actix web error -> 500 Internal Server Error
                         Ok(json!({
