@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 : 2023-01-08
+
+- Update lambda\_runtime 0.7.2
+
 ## 0.2.0 : 2022-07-10
 
 - Update lambda\_runtime 0.5.1

@@ -11,7 +11,7 @@ Currently, it supports Actix web, axum, Rocket, warp.
 ### Supported web frameworks
 
 - [Actix Web](https://crates.io/crates/actix-web) 4.0
-- [axum](https://crates.io/crates/axum) 0.5
+- [axum](https://crates.io/crates/axum) 0.6
 - [Rocket](https://crates.io/crates/rocket/0.5.0-rc.2) 0.5.0-rc.2
 - [warp](https://crates.io/crates/warp) 0.3
 
@@ -83,7 +83,7 @@ path = "src/main.rs"
 
 [dependencies]
 lambda-web = { version = "0.2.0", features=["hyper"] }
-axum = "0.5"
+axum = "0.6"
 tokio = { version = "1" }
 ```
 
