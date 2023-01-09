@@ -6,7 +6,6 @@ use crate::request::LambdaHttpEvent;
 use core::convert::TryFrom;
 use core::future::Future;
 use lambda_runtime::{Error as LambdaError, LambdaEvent, Service as LambdaService};
-use std::convert::Infallible;
 use std::pin::Pin;
 
 type HyperRequest = hyper::Request<hyper::Body>;
@@ -69,7 +68,7 @@ type HyperResponse<B> = hyper::Response<B>;
 /// ```
 pub async fn run_hyper_on_lambda<S, B>(svc: S) -> Result<(), LambdaError>
 where
-    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = LambdaError>
         + 'static,
     B: hyper::body::HttpBody,
     <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
@@ -81,20 +80,19 @@ where
 /// Lambda_runtime handler for hyper
 struct HyperHandler<S, B>(S)
 where
-    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
-        + 'static,
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>> + 'static,
     B: hyper::body::HttpBody,
     <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static;
 
 impl<S, B> LambdaService<LambdaEvent<LambdaHttpEvent<'_>>> for HyperHandler<S, B>
 where
-    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = Infallible>
+    S: hyper::service::Service<HyperRequest, Response = HyperResponse<B>, Error = LambdaError>
         + 'static,
     B: hyper::body::HttpBody,
     <B as hyper::body::HttpBody>::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = serde_json::Value;
-    type Error = Infallible;
+    type Error = LambdaError;
     type Future = Pin<Box<dyn Future<Output = Result<serde_json::Value, Self::Error>>>>;
 
     /// Returns Poll::Ready when servie can process more requrests.
