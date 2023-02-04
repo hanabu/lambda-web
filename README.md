@@ -231,3 +231,8 @@ To build Amazon Linux 2 compatible binary, see [Deploy.md](./Deploy.md) for more
   - ANY method on route `/{proxy+}` and attach Lambda proxy integration.
 - In settings tab, add `*/*` binary media type.
 - Then, deploy API to stage.
+
+
+## Lambda & API Gateway with AWS SAM
+
+See `examples/cicd/sam/README.md` for AWS SAM deployment hints.

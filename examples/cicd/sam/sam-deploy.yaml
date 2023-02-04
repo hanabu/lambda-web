@@ -1,0 +1,68 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+
+env:
+  AWS_REGION: 'us-east-1'
+  SAM_PATH: '/usr/local/bin/sam'
+  ARTIFACTS_NAME: packaged-app
+  ARTIFACTS_PATH: build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RUST_CHANNEL: nightly
+      TARGET_ARCH: x86_64-unknown-linux-musl
+    steps:
+      - run: |
+          sudo apt-get update -y
+          sudo apt-get install -y musl-tools
+      - uses: actions/checkout@v3
+      - run: rustup toolchain install ${{ env.RUST_CHANNEL }} --target ${{ env.TARGET_ARCH }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            target/${{ env.TARGET_ARCH }}
+          key: ${{ env.TARGET_ARCH }}-compiled-deps-for-lockfile-hash-${{ hashFiles('**/Cargo.lock') }}
+      - run: make build
+      - run: make ci-package
+      # https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ARTIFACTS_NAME }}
+          path: ${{ env.ARTIFACTS_PATH }}
+
+  deploy:
+    needs: 
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v3
+        id: cache-sam-bin
+        with:
+          path: ${{ env.SAM_PATH }}
+          key: sam-bin
+      - if: ${{ steps.cache-sam-bin.outputs.cache-hit != 'true' }}
+        run: |
+          curl -LO https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
+          sha256sum aws-sam-cli-linux-x86_64.zip
+          unzip aws-sam-cli-linux-x86_64.zip -d sam-installation
+          sudo ./sam-installation/install --update
+          which sam
+          sam --version
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.ARTIFACTS_NAME }}
+      - run: make deploy
