@@ -2,6 +2,7 @@
 //!
 //! Lambda event deserialize
 //!
+use aws_lambda_events::event::apigw::{ApiGatewayProxyRequest};
 use serde::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ use std::collections::HashMap;
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub(crate) enum LambdaHttpEvent<'a> {
+    ApiGatewayProxyRequest(ApiGatewayProxyRequest),
     ApiGatewayHttpV2(ApiGatewayHttpV2Event<'a>),
     ApiGatewayRestOrAlb(ApiGatewayRestEvent<'a>),
 }
@@ -17,6 +19,7 @@ impl LambdaHttpEvent<'_> {
     /// HTTP request method
     pub fn method<'a>(&'a self) -> &'a str {
         match self {
+            Self::ApiGatewayProxyRequest(event) => &event.http_method.as_str(),
             Self::ApiGatewayHttpV2(event) => &event.request_context.http.method,
             Self::ApiGatewayRestOrAlb(event) => &event.http_method,
         }
@@ -26,6 +29,10 @@ impl LambdaHttpEvent<'_> {
     #[allow(dead_code)]
     pub fn hostname<'a>(&'a self) -> Option<&'a str> {
         match self {
+            Self::ApiGatewayProxyRequest(event) => match &event.request_context.domain_name {
+                Some(domain_name) => Some(domain_name),
+                None => None,
+            },
             Self::ApiGatewayHttpV2(event) => Some(&event.request_context.domain_name),
             Self::ApiGatewayRestOrAlb(event) => {
                 if let RestOrAlbRequestContext::Rest(context) = &event.request_context {
@@ -42,6 +49,17 @@ impl LambdaHttpEvent<'_> {
     /// URL encoded path?query
     pub fn path_query(&self) -> String {
         match self {
+            Self::ApiGatewayProxyRequest(event) => {
+                let path = &event.path.clone().unwrap_or("".to_string());
+                if !event.multi_value_query_string_parameters.is_empty() {
+                    // With query string
+                    let querystr = event.multi_value_query_string_parameters.to_query_string();
+                    format!("{}?{}", path, querystr)
+                } else {
+                    // No query string
+                    path.clone()
+                }
+            }
             Self::ApiGatewayHttpV2(event) => {
                 let path = encode_path_query(&event.raw_path);
                 let query = &event.raw_query_string as &str;
@@ -84,6 +102,11 @@ impl LambdaHttpEvent<'_> {
     /// HTTP headers
     pub fn headers<'a>(&'a self) -> Vec<(&'a str, Cow<'a, str>)> {
         match self {
+            Self::ApiGatewayProxyRequest(event) => event
+                .multi_value_headers
+                .iter()
+                .map(|(k, v)| (k.as_str(), Cow::from(v.to_str().unwrap())))
+                .collect(),
             Self::ApiGatewayHttpV2(event) => {
                 let mut headers: Vec<(&'a str, Cow<'a, str>)> = event
                     .headers
@@ -112,6 +135,18 @@ impl LambdaHttpEvent<'_> {
     #[allow(dead_code)]
     pub fn cookies<'a>(&'a self) -> Vec<&'a str> {
         match self {
+            Self::ApiGatewayProxyRequest(event) => {
+                if let Some(cookie_headers) = event.multi_value_headers.get("cookie") {
+                    cookie_headers
+                        .to_str()
+                        .unwrap()
+                        .split(";")
+                        .map(|c| c.trim())
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            }
             Self::ApiGatewayHttpV2(event) => {
                 if let Some(cookies) = &event.cookies {
                     cookies.iter().map(|c| c.as_str()).collect()
@@ -138,6 +173,24 @@ impl LambdaHttpEvent<'_> {
     #[cfg(feature = "br")]
     pub fn client_supports_brotli(&self) -> bool {
         match self {
+            Self::ApiGatewayProxyRequest(event) => {
+                if let Some(header_val) = event.headers.get("accept-encoding") {
+                    for elm in header_val.to_str().unwrap().to_ascii_lowercase().split(',') {
+                        if let Some(algo_name) = elm.split(';').next() {
+                            // first part of elm, contains 'br', 'gzip', etc.
+                            if algo_name.trim() == "br" {
+                                // HTTP client support Brotli compression
+                                return true;
+                            }
+                        }
+                    }
+                    // No "br" in accept-encoding header
+                    false
+                } else {
+                    // No accept-encoding header
+                    false
+                }
+            }
             Self::ApiGatewayHttpV2(event) => {
                 if let Some(header_val) = event.headers.get("accept-encoding") {
                     for elm in header_val.to_ascii_lowercase().split(',') {
@@ -188,6 +241,7 @@ impl LambdaHttpEvent<'_> {
     /// Is request & response use multi-value-header
     pub fn multi_value(&self) -> bool {
         match self {
+            Self::ApiGatewayProxyRequest(_) => true,
             Self::ApiGatewayHttpV2(_) => false,
             Self::ApiGatewayRestOrAlb(_) => true,
         }
@@ -198,6 +252,9 @@ impl LambdaHttpEvent<'_> {
         let (body, b64_encoded) = match self {
             Self::ApiGatewayHttpV2(event) => (event.body, event.is_base64_encoded),
             Self::ApiGatewayRestOrAlb(event) => (event.body, event.is_base64_encoded),
+            Self::ApiGatewayProxyRequest(event) => {
+                (event.body.and_then(|b|Some(Cow::from(b))), event.is_base64_encoded.unwrap_or(false))
+            },
         };
 
         if let Some(body) = body {
@@ -220,6 +277,13 @@ impl LambdaHttpEvent<'_> {
         use std::net::IpAddr;
         use std::str::FromStr;
         match self {
+            Self::ApiGatewayProxyRequest(event) => {
+                if let Some(ip) = &event.request_context.identity.source_ip {
+                    IpAddr::from_str(ip).ok()
+                } else {
+                    None
+                }
+            }
             Self::ApiGatewayHttpV2(event) => {
                 IpAddr::from_str(&event.request_context.http.source_ip).ok()
             }
