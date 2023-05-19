@@ -38,9 +38,10 @@ use std::sync::Arc;
 pub async fn launch_rocket_on_lambda<P: rocket::Phase>(
     r: rocket::Rocket<P>,
 ) -> Result<(), LambdaError> {
-    lambda_runtime::run(RocketHandler(Arc::new(
+    let handler: RocketHandler = RocketHandler(Arc::new(
         rocket::local::asynchronous::Client::untracked(r).await?,
-    )))
+    ));
+    lambda_runtime::run(handler)
     .await?;
 
     Ok(())

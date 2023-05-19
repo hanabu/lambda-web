@@ -44,13 +44,12 @@ impl LambdaHttpEvent<'_> {
         match self {
             Self::ApiGatewayHttpV2(event) => {
                 let path = encode_path_query(&event.raw_path);
-                let query = &event.raw_query_string as &str;
-                if query.is_empty() {
-                    // No query string
-                    path.into_owned()
-                } else {
+
+                match event.raw_query_string.as_ref().filter(|x| !x.is_empty()) {
                     // With query string
-                    format!("{}?{}", path, query)
+                    Some(query) => format!("{}?{}", path, query),
+                    // No query string
+                    _ => path.into_owned(),
                 }
             }
             Self::ApiGatewayRestOrAlb(event) => {
@@ -242,7 +241,7 @@ pub(crate) struct ApiGatewayHttpV2Event<'a> {
     #[allow(dead_code)]
     version: String,
     raw_path: String,
-    raw_query_string: String,
+    raw_query_string: Option<String>,
     cookies: Option<Vec<String>>,
     headers: HashMap<String, String>,
     //#[serde(borrow)]
