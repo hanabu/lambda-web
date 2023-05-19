@@ -44,15 +44,12 @@ impl LambdaHttpEvent<'_> {
         match self {
             Self::ApiGatewayHttpV2(event) => {
                 let path = encode_path_query(&event.raw_path);
-                let query_string  = event.raw_query_string.clone().unwrap_or("".to_string());
-                let query = query_string.as_str();
 
-                if query.is_empty() {
-                    // No query string
-                    path.into_owned()
-                } else {
+                match event.raw_query_string.as_ref().filter(|x| !x.is_empty()) {
                     // With query string
-                    format!("{}?{}", path, query)
+                    Some(query) => format!("{}?{}", path, query),
+                    // No query string
+                    _ => path.into_owned(),
                 }
             }
             Self::ApiGatewayRestOrAlb(event) => {
