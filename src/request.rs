@@ -44,7 +44,9 @@ impl LambdaHttpEvent<'_> {
         match self {
             Self::ApiGatewayHttpV2(event) => {
                 let path = encode_path_query(&event.raw_path);
-                let query = &event.raw_query_string as &str;
+                let query_string  = event.raw_query_string.clone().unwrap_or("".to_string());
+                let query = query_string.as_str();
+
                 if query.is_empty() {
                     // No query string
                     path.into_owned()
@@ -242,7 +244,7 @@ pub(crate) struct ApiGatewayHttpV2Event<'a> {
     #[allow(dead_code)]
     version: String,
     raw_path: String,
-    raw_query_string: String,
+    raw_query_string: Option<String>,
     cookies: Option<Vec<String>>,
     headers: HashMap<String, String>,
     //#[serde(borrow)]
