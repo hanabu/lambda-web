@@ -13,16 +13,6 @@ pub(crate) enum LambdaHttpEvent<'a> {
     ApiGatewayRestOrAlb(ApiGatewayRestEvent<'a>),
 }
 
-// impl<'de> Deserialize<'de> for LambdaHttpEvent<'_> {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de> {
-//             let value = serde_json::Value::deserialize(deserializer)?;
-//             println!("LAMBDA HTTP EVENT JSON:{}", value.to_string());
-//             return Err(D::Error::custom("Not implemented"));
-//     }
-// }
-
 impl LambdaHttpEvent<'_> {
     /// HTTP request method
     pub fn method<'a>(&'a self) -> &'a str {

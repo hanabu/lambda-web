@@ -38,13 +38,6 @@ use std::sync::Arc;
 pub async fn launch_rocket_on_lambda<P: rocket::Phase>(
     r: rocket::Rocket<P>,
 ) -> Result<(), LambdaError> {
-    // println!("launched rocket");
-
-    // let thing = r#"{"body":null,"cookies":null,"headers":{"accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7","accept-encoding":"gzip, deflate, br","accept-language":"en-US,en;q=0.9","cache-control":"max-age=0","connection":"keep-alive","host":"localhost:9000","lambda-runtime-aws-request-id":"8c639787-10ef-4e7f-96e9-148ce877b284","sec-ch-ua":"\"Chromium\";v=\"110\", \"Not A(Brand\";v=\"24\", \"Google Chrome\";v=\"110\"","sec-ch-ua-mobile":"?0","sec-ch-ua-platform":"\"macOS\"","sec-fetch-dest":"document","sec-fetch-mode":"navigate","sec-fetch-site":"none","sec-fetch-user":"?1","upgrade-insecure-requests":"1","user-agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"},"isBase64Encoded":false,"pathParameters":{},"queryStringParameters":{},"rawPath":"/","rawQueryString":null,"requestContext":{"accountId":null,"apiId":null,"authentication":null,"authorizer":null,"domainName":"localhost","domainPrefix":"_","http":{"method":"GET","path":"/","protocol":"http","sourceIp":"127.0.0.1","userAgent":"cargo-lambda"},"requestId":"8c639787-10ef-4e7f-96e9-148ce877b284","routeKey":"$default","stage":"$default","time":"19/May/2023:03:14:42 +0000","timeEpoch":1684466082},"routeKey":"$default","stageVariables":{},"version":"2.0"}"#;
-    // let parsed_thing: Result<ApiGatewayHttpV2Event, _> = serde_json::from_str(thing);
-    // println!("parsedThing: {:?}", parsed_thing);
-
-
     let handler: RocketHandler = RocketHandler(Arc::new(
         rocket::local::asynchronous::Client::untracked(r).await?,
     ));
@@ -74,7 +67,6 @@ impl LambdaService<LambdaEvent<LambdaHttpEvent<'_>>> for RocketHandler {
     /// Parse Lambda event as Rocket LocalRequest,
     /// serialize Rocket LocalResponse to Lambda JSON response
     fn call(&mut self, req: LambdaEvent<LambdaHttpEvent<'_>>) -> Self::Future {
-        println!("called lambda");
         use serde_json::json;
 
         let event = req.payload;
